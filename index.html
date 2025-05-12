@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Golden Glow - Persian-themed Mini Games</title>
+  <!-- No external scripts needed, using bundled Telegram WebApp implementation -->
+  <script>
+    // Add global error handling
+    window.addEventListener('error', function(event) {
+      console.error('Global error caught:', event.error);
+      const errorElement = document.getElementById('error-message');
+      if (errorElement) {
+        errorElement.textContent = event.error ? ('Error: ' + event.error.message) : 'Unknown error occurred';
+      }
+    });
+    
+    console.log('Telegram WebApp will be initialized during React bootstrapping');
+  </script>
+  <!-- Disable Cloudflare analytics if being automatically injected -->
+  <script>
+    // Block Cloudflare analytics requests
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+      if (url && typeof url === 'string' && url.includes('cloudflareinsights.com')) {
+        console.log('Blocked request to:', url);
+        return Promise.resolve(new Response('', { status: 200 }));
+      }
+      return originalFetch.apply(this, arguments);
+    };
+
+    // Also block XMLHttpRequest to the same domain
+    const originalOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...args) {
+      if (url && typeof url === 'string' && url.includes('cloudflareinsights.com')) {
+        console.log('Blocked XHR to:', url);
+        this.abort();
+        return;
+      }
+      return originalOpen.call(this, method, url, ...args);
+    };
+  </script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <!-- Error message container -->
+  <div id="error-container" style="display:none; position:fixed; bottom:10px; left:10px; right:10px; background:#ffcdd2; color:#b71c1c; padding:15px; border-radius:5px; z-index:9999;">
+    <p id="error-message">An error occurred</p>
+    <button onclick="this.parentElement.style.display='none'" style="position:absolute; top:5px; right:5px; background:none; border:none; cursor:pointer;">✕</button>
+  </div>
+  
+  <script>
+    // Add this to show/hide error container
+    function showError(message) {
+      const container = document.getElementById('error-container');
+      const msgElement = document.getElementById('error-message');
+      if (container && msgElement) {
+        msgElement.textContent = message;
+        container.style.display = 'block';
+      }
+    }
+
+    // Initialize app with better error handling
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('DOM loaded, checking React initialization...');
+      setTimeout(() => {
+        const rootContent = document.getElementById('root');
+        if (rootContent && rootContent.children.length === 0) {
+          console.warn('React app did not render within expected timeframe');
+          showError('App failed to initialize. Please check console for details or refresh the page.');
+        }
+      }, 5000); // Check after 5 seconds
+    });
+  </script>
+  
+  <!-- Additional error handling -->
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      console.error('JavaScript error caught:', message, 'at', source, lineno, colno, error);
+      showError('JavaScript error: ' + message);
+      return false;
+    };
+  </script>
+  
+  <!-- Using Vite's standard entry point pattern -->
+  <script type="module" src="./main.jsx"></script>
+</body>
+
+</html>

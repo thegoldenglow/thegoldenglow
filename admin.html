@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Golden Glow Admin - Management Dashboard</title>
+  <!-- Disable Cloudflare analytics if being automatically injected -->
+  <script>
+    // Block Cloudflare analytics requests
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+      if (url && typeof url === 'string' && url.includes('cloudflareinsights.com')) {
+        console.log('Blocked request to:', url);
+        return Promise.resolve(new Response('', { status: 200 }));
+      }
+      return originalFetch.apply(this, arguments);
+    };
+
+    // Also block XMLHttpRequest to the same domain
+    const originalOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...args) {
+      if (url && typeof url === 'string' && url.includes('cloudflareinsights.com')) {
+        console.log('Blocked XHR to:', url);
+        this.abort();
+        return;
+      }
+      return originalOpen.call(this, method, url, ...args);
+    };
+  </script>
+  <!-- Base tag removed to fix path resolution issues -->
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/admin-main.jsx"></script>
+</body>
+
+</html>

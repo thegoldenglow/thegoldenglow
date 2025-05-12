@@ -1,0 +1,162 @@
+/* Import Persian/Arabic inspired fonts from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Scheherazade+New:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global styles */
+html, body, #root {
+  @apply bg-deepLapis text-textLight;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  height: 100%;
+  font-family: 'Poppins', sans-serif;
+  /* Allow scrolling by default */
+  overflow: auto;
+}
+
+/* Default text colors */
+h1, h2, h3, h4, h5, h6 {
+  @apply text-textGold font-primary;
+}
+
+p, span, div {
+  @apply text-textLight;
+}
+
+/* Add decorative Persian/Arabic pattern overlays to the background */
+.bg-pattern {
+  background-color: #1A237E;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.627 0l.83.828-1.415 1.415L51.8 0h2.827zM5.373 0l-.83.828L5.96 2.243 8.2 0H5.374zM48.97 0l3.657 3.657-1.414 1.414L46.143 0h2.828zM11.03 0L7.372 3.657 8.787 5.07 13.857 0H11.03zm32.284 0L49.8 6.485 48.384 7.9l-7.9-7.9h2.83zm-24.596 0l7.9 7.9-1.415 1.414L17.717 0h2.827zm16.697 0L42.8 8.485l-1.414 1.414-8.485-8.485h2.827zm-8.798 0l8.485 8.485-1.414 1.414L25.716 0h2.828zm0 0' fill='%233949ab' fill-opacity='0.3' fill-rule='evenodd'/%3E%3C/svg%3E");
+  position: relative;
+}
+
+.bg-pattern-arabesque {
+  background-color: #1A237E;
+  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M40 0c-5.523 0-10 4.477-10 10 0 5.523 4.477 10 10 10 5.523 0 10-4.477 10-10 0-5.523-4.477-10-10-10zm0 60c-5.523 0-10 4.477-10 10 0 5.523 4.477 10 10 10 5.523 0 10-4.477 10-10 0-5.523-4.477-10-10-10zm-40-20c0-5.523 4.477-10 10-10 5.523 0 10 4.477 10 10 0 5.523-4.477 10-10 10-5.523 0-10-4.477-10-10zm60 0c0-5.523 4.477-10 10-10 5.523 0 10 4.477 10 10 0 5.523-4.477 10-10 10-5.523 0-10-4.477-10-10zm-37.071 44.142c-3.905-3.905-3.905-10.237 0-14.142 3.905-3.905 10.237-3.905 14.142 0 3.905 3.905 3.905 10.237 0 14.142-3.905 3.905-10.237 3.905-14.142 0zm0-70.071c-3.905-3.905-3.905-10.237 0-14.142 3.905-3.905 10.237-3.905 14.142 0 3.905 3.905 3.905 10.237 0 14.142-3.905 3.905-10.237 3.905-14.142 0zm-14.142 14.142c-3.905 3.905-10.237 3.905-14.142 0-3.905-3.905-3.905-10.237 0-14.142 3.905-3.905 10.237-3.905 14.142 0 3.905 3.905 3.905 10.237 0 14.142zm70.07 0c-3.904 3.905-10.236 3.905-14.141 0-3.905-3.905-3.905-10.237 0-14.142 3.905-3.905 10.237-3.905 14.142 0 3.905 3.905 3.905 10.237 0 14.142z' fill='%23DAA520' fill-opacity='0.15' fill-rule='evenodd'/%3E%3C/svg%3E");
+  position: relative;
+}
+
+.bg-pattern-stars {
+  background-color: #1A237E;
+  background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z' fill='%23DAA520' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+  position: relative;
+}
+
+/* Add a gold gradient shine effect to the top of the page */
+.bg-pattern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: linear-gradient(90deg, transparent, #DAA520, transparent);
+  z-index: 10;
+}
+
+/* Decorative border style */
+.arabesque-border {
+  @apply border-2 border-royalGold rounded-md relative;
+  position: relative;
+}
+
+.arabesque-border::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  border-radius: inherit;
+  background: linear-gradient(45deg, #DAA520, transparent 30%, transparent 70%, #DAA520);
+  z-index: -1;
+  margin: -2px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: rgba(26, 35, 126, 0.8);
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 25px;
+  background-color: rgba(218, 165, 32, 0.6);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(218, 165, 32, 0.8);
+}
+
+::-webkit-scrollbar-corner {
+  display: none;
+}
+
+/* Animation keyframes */
+@keyframes shimmer {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes wheel-flare {
+  0% { box-shadow: 0 0 5px rgba(218, 165, 32, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(218, 165, 32, 0.6); }
+  100% { box-shadow: 0 0 5px rgba(218, 165, 32, 0.3); }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+/* Utility classes */
+.shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Reward System Styles */
+.shadow-glow {
+  box-shadow: 0 0 10px rgba(218, 165, 32, 0.3);
+}
+
+.clip-triangle {
+  clip-path: polygon(50% 0, 0% 100%, 100% 100%);
+}
+
+/* Golden Credits text styles */
+.text-credits {
+  background: linear-gradient(90deg, #FFC857, #DAA520, #FFD700);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0px 0px 3px rgba(218, 165, 32, 0.3);
+}

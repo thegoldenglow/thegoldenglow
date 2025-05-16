@@ -88,7 +88,7 @@ const WheelOfDestiny = () => {
         // Update the state with the final rotation first
         setCurrentRotation(targetRotation);
         
-        // Wait a tiny bit more to show the result after the wheel has fully stopped
+        // Wait longer to show the result after the wheel has fully stopped to ensure the animation is complete
         setTimeout(() => {
           setSelectedSegment(result.segment);
           
@@ -99,7 +99,7 @@ const WheelOfDestiny = () => {
               // Handle 'Try Again' - could mark as claimed or just update UI
               claimWheelReward(wheelOfDestiny.currentSpin.id); // Mark as processed
           }
-        }, 200); // Short delay after wheel stops before showing result
+        }, 1000); // Increased delay after wheel stops before showing result (1 second)
       }, spinDuration + 100);
 
     } catch (error) {
@@ -224,6 +224,7 @@ const WheelOfDestiny = () => {
         {/* Mystic glow effect around the wheel using Framer Motion */}
         <motion.div 
           className="absolute inset-0 rounded-full z-0" 
+          data-component-name="MotionComponent"
           animate={{
             boxShadow: [
               '0px 0px 20px 0px rgba(75, 0, 130, 0.5), 0px 0px 30px 5px rgba(138, 43, 226, 0.3)', // State 1: Indigo base, fainter purple outer
@@ -364,10 +365,11 @@ const WheelOfDestiny = () => {
 
       {/* UI Controls and Status Messages */}
       <div className="mt-8 text-center w-full max-w-md">
-        {selectedSegment && (
+        {selectedSegment && !isSpinning && (
           <motion.div 
             initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} transition={{delay:0.2}}
             className="mb-4 p-4 bg-mysticPurple-light border border-ancientGold rounded-lg shadow-lg"
+            data-component-name="MotionComponent"
           >
             <p className="text-xl font-primary text-ancientGold-light">
               Landed on: <span className="font-bold">{selectedSegment.label}</span>

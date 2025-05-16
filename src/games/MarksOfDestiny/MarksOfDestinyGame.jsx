@@ -128,7 +128,7 @@ const MarksOfDestinyGame = () => {
                 
                 saveStats({ 
                   gamesWon: 1,
-                  pointsEarned: gameMode === 'ai' ? (aiDifficulty === 'easy' ? 5 : aiDifficulty === 'medium' ? 10 : 15) : 0
+                  pointsEarned: gameMode === 'ai' ? (aiDifficulty === 'easy' ? 5 : (aiDifficulty === 'medium' ? 10 : 15)) : 0
                 });
               } else { // Player lost or non-AI game win for opponent
                 const participationResult = await awardGameReward('marks-of-destiny', 'participation');

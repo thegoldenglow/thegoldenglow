@@ -489,12 +489,12 @@ const GameBoard = ({ gameOver, onGameOver, onScoreUpdate, onRestart }) => {
             transition={{ duration: 0.5 }}
           >
             <h3 className="text-xl text-royalGold font-primary mb-2">
-              {maxTile >= 2048 ? 'Enlightenment!' : 'Journey Ended'}
+              {maxTile >= 2048 ? 'Enlightenment!' : 'Board Filled'}
             </h3>
             <p className="text-white text-center mb-4">
               {maxTile >= 2048
                 ? 'You have reached true enlightenment!'
-                : `You achieved the ${maxTile} tile.`}
+                : 'You must play again.'}
             </p>
             <Button
               variant="primary"

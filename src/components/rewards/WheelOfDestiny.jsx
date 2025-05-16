@@ -73,23 +73,34 @@ const WheelOfDestiny = () => {
       const targetAngleForSegment = (totalSegments - segmentIndex - 0.5) * segmentAngle;
       const targetRotation = (360 * extraRotations) + targetAngleForSegment;
       
+      // Set the wheel animation duration to 6 seconds
+      const spinDuration = 6000;
+      
       if (wheelRef.current) {
-        wheelRef.current.style.transition = 'transform 6s cubic-bezier(0.25, 0.1, 0.25, 1)';
+        wheelRef.current.style.transition = `transform ${spinDuration/1000}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
         wheelRef.current.style.transform = `rotate(${targetRotation}deg)`;
       }
 
+      // Wait for the animation to complete plus a small buffer to ensure wheel is fully stopped
+      // before showing the result and updating state
       setTimeout(() => {
         setIsSpinning(false);
-        setSelectedSegment(result.segment);
-        setCurrentRotation(targetRotation % 360);
-        // Auto-claim logic (ensure currentSpin is updated in context for this to work if needed elsewhere)
-        if (result.segment.value > 0 && wheelOfDestiny.currentSpin?.id) {
-            handleClaimReward(wheelOfDestiny.currentSpin.id, result.segment); 
-        } else if (result.segment.value === 0 && wheelOfDestiny.currentSpin?.id) {
-            // Handle 'Try Again' - could mark as claimed or just update UI
-            claimWheelReward(wheelOfDestiny.currentSpin.id); // Mark as processed
-        }
-      }, 6000);
+        // Update the state with the final rotation first
+        setCurrentRotation(targetRotation);
+        
+        // Wait a tiny bit more to show the result after the wheel has fully stopped
+        setTimeout(() => {
+          setSelectedSegment(result.segment);
+          
+          // Auto-claim logic (ensure currentSpin is updated in context for this to work if needed elsewhere)
+          if (result.segment.value > 0 && wheelOfDestiny.currentSpin?.id) {
+              handleClaimReward(wheelOfDestiny.currentSpin.id, result.segment); 
+          } else if (result.segment.value === 0 && wheelOfDestiny.currentSpin?.id) {
+              // Handle 'Try Again' - could mark as claimed or just update UI
+              claimWheelReward(wheelOfDestiny.currentSpin.id); // Mark as processed
+          }
+        }, 200); // Short delay after wheel stops before showing result
+      }, spinDuration + 100);
 
     } catch (error) {
       console.error('Error spinning wheel:', error);
@@ -205,8 +216,9 @@ const WheelOfDestiny = () => {
                 borderLeft: '16px solid transparent', 
                 borderRight: '16px solid transparent', 
                 borderBottom: `28px solid var(--color-ancientGold-light, #D4AF37)`, // Ensure ancientGold-light is defined in Tailwind or use direct hex
-                filter: 'drop-shadow(0 3px 3px rgba(0,0,0,0.4))'
-            }}></div>
+                filter: 'drop-shadow(0 3px 3px rgba(0,0,0,0.4))',
+                transform: 'rotate(180deg)'
+            }} data-component-name="WheelOfDestiny"></div>
         </div>
 
         {/* Mystic glow effect around the wheel using Framer Motion */}

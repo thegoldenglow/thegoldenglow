@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../utils/supabase';
+import { supabase } from '../../../utils/supabase';
+// Fix the import path for SyncTasksService which was causing app loading issues
+import { SyncTasksService } from '../../../components/tasks/SyncTasksService';
 
 const TaskManagement = () => {
   const [tasks, setTasks] = useState([]);
@@ -17,6 +19,9 @@ const TaskManagement = () => {
   const tasksPerPage = 5;
   const [isSubmittingTask, setIsSubmittingTask] = useState(false);
   const [isDeletingTask, setIsDeletingTask] = useState(null);
+  
+  // Create sync service instance
+  const syncService = new SyncTasksService();
 
   const initialTaskFormData = {
     title: '',
@@ -63,7 +68,24 @@ const TaskManagement = () => {
 
       if (fetchError) throw fetchError;
 
-      setTasks(data || []);
+      // Enhance tasks with locally stored extra fields
+      let enhancedTasks = [];
+      if (data && data.length > 0) {
+        const taskExtraFields = JSON.parse(localStorage.getItem('taskExtraFields') || '{}');
+        
+        enhancedTasks = data.map(task => {
+          const extraData = taskExtraFields[task.id] || {};
+          return {
+            ...task,
+            platform: extraData.platform || 'Unknown',
+            target_username: extraData.targetUsername || '',
+            quantity: extraData.quantity || 1,
+            game_identifier: extraData.gameIdentifier || ''
+          };
+        });
+      }
+
+      setTasks(enhancedTasks.length > 0 ? enhancedTasks : data || []);
 
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -146,36 +168,80 @@ const TaskManagement = () => {
     }
     setIsSubmittingTask(true);
     setError(null);
-
-    const payload = {
+    
+    // Store all the extra fields that don't exist in the database schema
+    const extraFields = {
+      platform: taskFormData.platform,
+      targetUsername: taskFormData.targetUsername || null,
+      quantity: parseInt(taskFormData.quantity, 10) || 1,
+      gameIdentifier: taskFormData.gameIdentifier || null
+    };
+    console.log('Extra fields (storing locally):', extraFields);
+    
+    // Include only fields that are definitely in the database schema
+    // Do NOT include game_identifier to avoid the schema cache issue
+    const taskData = {
       title: taskFormData.title,
       description: taskFormData.description,
       type: taskFormData.taskCategory,
-      platform: taskFormData.platform,
-      target_username: taskFormData.targetUsername || null,
-      quantity: parseInt(taskFormData.quantity, 10) || 1,
-      game_identifier: taskFormData.gameIdentifier || null,
-      reward: parseFloat(taskFormData.reward) || 0,
-      status: taskFormData.status,
+      reward: String(taskFormData.reward), // Database expects TEXT
+      status: taskFormData.status
     };
 
     try {
-      let queryError;
+      let taskId;
+      let error = null;
+      
       if (editingTask) {
-        const { error } = await supabase
+        // Update existing task
+        const { error: updateError } = await supabase
           .from('tasks')
-          .update(payload)
+          .update(taskData)
           .eq('id', editingTask.id);
-        queryError = error;
+          
+        error = updateError;
+        taskId = editingTask.id;
       } else {
-        payload.created_at = new Date().toISOString();
-        const { error } = await supabase
+        // Create new task
+        const { data: newTask, error: insertError } = await supabase
           .from('tasks')
-          .insert([payload]);
-        queryError = error;
+          .insert([taskData])
+          .select();
+          
+        error = insertError;
+        
+        if (newTask && newTask.length > 0) {
+          taskId = newTask[0].id;
+        }
       }
-
-      if (queryError) throw queryError;
+      
+      if (error) {
+        // If we get an error, log it with more details
+        console.error('Database operation error:', error);
+        throw error;
+      }
+      
+      // If the task was created/updated successfully, store the extra fields 
+      // separately in localStorage until we update the schema
+      const { data } = editingTask ? 
+        { data: { id: editingTask.id } } : // For existing tasks, we already know the id
+        await supabase // For new tasks, fetch the most recently created task
+          .from('tasks')
+          .select('id')
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+      if (data && data.id) {
+        const taskId = editingTask ? editingTask.id : data.id;
+        const taskExtraFields = JSON.parse(localStorage.getItem('taskExtraFields') || '{}');
+        taskExtraFields[taskId] = extraFields;
+        localStorage.setItem('taskExtraFields', JSON.stringify(taskExtraFields));
+        console.log(`Extra fields saved for task ${taskId}`);
+        
+        // Sync the new/updated task to local storage so it shows on the DailyTasksPage
+        await syncService.syncFromSupabase();
+        console.log('Tasks synced after adding/updating task');
+      }
 
       await fetchTasksAndStats();
       closeTaskModal();

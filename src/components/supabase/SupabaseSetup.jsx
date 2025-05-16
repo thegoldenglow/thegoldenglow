@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../utils/supabase';
+import { supabase, checkSupabaseConnection } from '../../utils/supabase';
+import SupabaseMCP from './SupabaseMCP';
 
 const SupabaseSetup = () => {
   const [status, setStatus] = useState('checking');
@@ -109,7 +110,11 @@ USING (auth.uid() = id);
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto bg-deepLapis shadow-lg rounded-lg border border-royalGold/20">
+    <>
+      {/* Supabase MCP Server Integration */}
+      <SupabaseMCP />
+      
+      <div className="p-6 max-w-4xl mx-auto bg-deepLapis shadow-lg rounded-lg border border-royalGold/20">
       <h2 className="text-2xl font-bold mb-4 text-royalGold">Supabase Setup</h2>
       
       <div className="mb-6 p-4 rounded bg-deepLapisDark border border-royalGold/10">
@@ -185,6 +190,7 @@ USING (auth.uid() = id);
         </div>
       </div>
     </div>
+    </>
   );
 };
 

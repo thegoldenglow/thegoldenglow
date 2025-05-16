@@ -28,6 +28,12 @@ const FlameOfWisdomGame = () => {
   const [totalWisdomPoints, setTotalWisdomPoints] = useState(0);
   const [sessionPoints, setSessionPoints] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  
+  // 30-second timer states
+  const [timerActive, setTimerActive] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(30);
+  const [timerTapCount, setTimerTapCount] = useState(0);
+  const [timerHighScore, setTimerHighScore] = useState(0);
   const [upgrades, setUpgrades] = useState([
     { id: 'auto-tap', name: 'Meditation Focus', description: 'Automatically nurtures the flame once per second', cost: 100, level: 0, effect: 1 },
     { id: 'tap-power', name: 'Inner Strength', description: 'Each tap produces more energy', cost: 50, level: 0, effect: 1 },
@@ -55,8 +61,10 @@ const FlameOfWisdomGame = () => {
       const savedTotalPoints = gameData.stats?.totalWisdomPoints || 0;
       const savedFlameLevel = gameData.stats?.highestFlameLevel || 1;
       const savedUpgrades = gameData.stats?.upgrades || [];
+      const savedTimerHighScore = gameData.stats?.timerHighScore || 0;
       
       setTotalWisdomPoints(savedTotalPoints);
+      setTimerHighScore(savedTimerHighScore);
       
       // Apply saved upgrades
       if (savedUpgrades.length > 0) {
@@ -79,6 +87,11 @@ const FlameOfWisdomGame = () => {
     setTapCount(0);
     setSessionPoints(0);
     setPointsTimer(0);
+    
+    // Start the 30-second timer
+    setTimerActive(true);
+    setTimeRemaining(30);
+    setTimerTapCount(0);
     
     // Award participation reward
     setTimeout(() => {
@@ -137,6 +150,11 @@ const FlameOfWisdomGame = () => {
     setTapCount(prev => prev + 1);
     updateUserPoints(0.5); // Award 0.5 GC points per tap
     
+    // Track taps during the 30-second timer session
+    if (timerActive) {
+      setTimerTapCount(prev => prev + 1);
+    }
+    
     // Calculate tap power with upgrades
     const tapPowerUpgrade = upgrades.find(u => u.id === 'tap-power');
     const tapPower = BASE_TAP_POWER + (tapPowerUpgrade ? tapPowerUpgrade.level * tapPowerUpgrade.effect : 0);
@@ -171,7 +189,8 @@ const FlameOfWisdomGame = () => {
         // Save stats
         saveStats({
           highestFlameLevel: Math.max(newLevel, gameData?.stats?.highestFlameLevel || 0),
-          totalTaps: tapCount + 1
+          totalTaps: tapCount + 1,
+          timerHighScore: Math.max(timerHighScore, timerTapCount)
         });
       }
       
@@ -239,6 +258,38 @@ const FlameOfWisdomGame = () => {
       }
     }
   }, [gameStarted, upgrades.find(u => u.id === 'auto-tap')?.level]);
+  
+  // Timer effect for 30-second session
+  useEffect(() => {
+    let timer;
+    if (timerActive && timeRemaining > 0) {
+      timer = setTimeout(() => {
+        setTimeRemaining(prev => prev - 1);
+      }, 1000);
+    } else if (timeRemaining === 0 && timerActive) {
+      setTimerActive(false);
+      
+      // Update high score if current session beat previous record
+      if (timerTapCount > timerHighScore) {
+        setTimerHighScore(timerTapCount);
+        
+        // Save the new high score
+        saveStats({
+          ...gameData?.stats,
+          timerHighScore: timerTapCount
+        });
+      }
+    }
+    
+    return () => clearTimeout(timer);
+  }, [timerActive, timeRemaining, timerTapCount, timerHighScore, gameData?.stats]);
+  
+  // Restart the 30-second timer
+  const restartTimer = () => {
+    setTimerActive(true);
+    setTimeRemaining(30);
+    setTimerTapCount(0);
+  };
   
   // Purchase upgrade
   const purchaseUpgrade = (upgradeId) => {
@@ -404,6 +455,10 @@ const FlameOfWisdomGame = () => {
                   <p className="text-xs text-white/70">Global GC Points</p>
                   <p className="text-lg text-white">{user?.points || 0}</p>
                 </div>
+                <div>
+                  <p className="text-xs text-white/70">30s Record</p>
+                  <p className="text-lg text-royalGold">{gameData?.stats?.timerHighScore || 0}</p>
+                </div>
               </div>
             </div>
             
@@ -447,6 +502,34 @@ const FlameOfWisdomGame = () => {
                     <span className="text-xs text-royalGold ml-1 animate-pulse">(Session: +{sessionPoints})</span>
                   )}
                 </p>
+              </div>
+            </div>
+            
+            {/* 30-second timer display */}
+            <div className="w-full bg-deepLapisLight/50 rounded-md p-3 mb-3">
+              <div className="flex justify-between items-center mb-1">
+                <p className="text-white/70 text-sm">30 Second Challenge</p>
+                <p className="text-royalGold font-medium">
+                  {timerActive ? `${timeRemaining}s` : 'Complete'}
+                </p>
+              </div>
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-xs text-white/70">Current Taps</p>
+                  <p className="text-lg text-white">{timerTapCount}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-white/70">Record</p>
+                  <p className="text-lg text-royalGold">{timerHighScore}</p>
+                </div>
+                {!timerActive && (
+                  <button 
+                    onClick={restartTimer}
+                    className="bg-royalGold/30 hover:bg-royalGold/50 text-white text-xs py-1 px-3 rounded transition-colors"
+                  >
+                    Try Again
+                  </button>
+                )}
               </div>
             </div>
             
@@ -555,7 +638,7 @@ const FlameOfWisdomGame = () => {
                         <div className="ml-2">
                           <Button 
                             variant={canAfford ? "primary" : "outline"} 
-                            size="sm"
+                            size="small"
                             disabled={!canAfford}
                             onClick={() => purchaseUpgrade(upgrade.id)}
                           >

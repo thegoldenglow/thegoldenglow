@@ -1,5 +1,6 @@
 import { StorageManager } from './StorageManager';
 import { AdManager } from './AdManager';
+import { SyncTasksService } from './SyncTasksService';
 import { generateTasks, checkAndUpdateStreak, getDefaultUserStats } from '../../utils/taskUtils';
 
 export class TasksManager {
@@ -7,6 +8,7 @@ export class TasksManager {
     this.dispatch = dispatch;
     this.storageManager = new StorageManager();
     this.adManager = new AdManager();
+    this.syncService = new SyncTasksService();
     this.taskList = [];
     this.streakData = {
       current: 0,
@@ -26,16 +28,55 @@ export class TasksManager {
 
   async loadTasks() {
     try {
-      // Try to load tasks from storage
-      const tasksData = this.storageManager.loadData('gg_tasks');
+      // Try to load from emergency cache first (from our simplified SyncTasksService)
+      const emergencyTasks = localStorage.getItem('emergency_tasks');
       
-      if (tasksData && !this.isTasksDataStale(tasksData)) {
-        this.taskList = tasksData.tasks;
-        this.dispatch({ type: 'TASKS_LOADED', payload: tasksData.tasks });
-      } else {
-        // Generate new tasks if no data or data is stale
-        await this.refreshDailyTasks();
+      if (emergencyTasks) {
+        try {
+          const parsedTasks = JSON.parse(emergencyTasks);
+          console.log('Using emergency tasks from cache:', parsedTasks.length);
+          
+          // Convert to the expected format
+          const formattedTasks = parsedTasks.map(task => ({
+            id: task.id.toString(),
+            title: task.title,
+            description: task.description,
+            type: task.type || 'Daily', 
+            targetGame: null,
+            requirement: 1,
+            progress: 0,
+            completed: false,
+            claimed: false,
+            adBoostAvailable: true,
+            expiresAt: new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+            rewards: [
+              {
+                type: 'MYSTIC_COINS',
+                amount: parseFloat(task.reward) || 10
+              }
+            ]
+          }));
+          
+          this.taskList = formattedTasks;
+          this.dispatch({ type: 'TASKS_LOADED', payload: formattedTasks });
+          
+          // Also try to sync in the background
+          this.syncService.syncFromSupabase().catch(e => console.warn('Background sync failed:', e));
+          
+          return;
+        } catch (parseError) {
+          console.error('Error parsing emergency tasks:', parseError);
+        }
       }
+      
+      // Fallback to generating tasks if we don't have any cached tasks
+      console.log('No emergency tasks found, generating local tasks...');
+      const tasks = generateTasks();
+      this.taskList = tasks;
+      this.dispatch({ type: 'TASKS_LOADED', payload: tasks });
+      
+      // Try syncing in the background for next reload
+      this.syncService.syncFromSupabase().catch(e => console.warn('Background sync failed:', e));
     } catch (error) {
       console.error('Error loading tasks:', error);
       this.dispatch({ type: 'SET_ERROR', payload: 'Failed to load tasks' });
@@ -91,19 +132,19 @@ export class TasksManager {
 
   async refreshDailyTasks() {
     try {
-      const tasks = generateTasks();
+      // Instead of generating local tasks, just re-sync with the database
+      await this.syncService.syncFromSupabase();
+      
+      // Reload synced tasks from storage
+      const refreshedTasksData = this.storageManager.loadData('gg_tasks');
+      const tasks = refreshedTasksData?.tasks || [];
+      
       this.taskList = tasks;
-
-      // Save tasks with refresh timestamp
-      this.storageManager.saveData('gg_tasks', {
-        tasks,
-        lastRefreshDate: new Date().toISOString()
-      });
-
       this.dispatch({ type: 'TASKS_LOADED', payload: tasks });
+      console.log('Refreshed tasks from database:', tasks.length);
       return tasks;
     } catch (error) {
-      console.error('Error refreshing tasks:', error);
+      console.error('Error refreshing tasks from database:', error);
       return [];
     }
   }
@@ -241,8 +282,20 @@ export class TasksManager {
   checkForDailyRefresh() {
     try {
       const tasksData = this.storageManager.loadData('gg_tasks');
-      if (this.isTasksDataStale(tasksData)) {
-        // Update streak before refreshing tasks
+      const currentDate = new Date();
+      const lastSyncDate = tasksData?.lastSyncDate ? new Date(tasksData.lastSyncDate) : null;
+      
+      // If last sync was more than 1 hour ago, or it's a different day, refresh from database
+      const needsRefresh = !lastSyncDate || 
+        (currentDate - lastSyncDate) > (60 * 60 * 1000) || // 1 hour in milliseconds
+        lastSyncDate.getDate() !== currentDate.getDate() || 
+        lastSyncDate.getMonth() !== currentDate.getMonth() || 
+        lastSyncDate.getFullYear() !== currentDate.getFullYear();
+      
+      if (needsRefresh) {
+        console.log('Tasks are stale, refreshing from database...');
+        
+        // Update streak data
         const updatedStreak = checkAndUpdateStreak(
           this.streakData,
           this.taskList
@@ -266,7 +319,7 @@ export class TasksManager {
           lastResetDate: new Date().toISOString()
         });
         
-        // Refresh tasks for the new day
+        // Refresh tasks from database instead of generating new ones
         this.refreshDailyTasks();
       }
     } catch (error) {

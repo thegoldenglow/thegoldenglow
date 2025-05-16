@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { supabase } from '../../../utils/supabase';
+import { getUserStats, addListener } from '../../utils/adminDataService';
 
 // Remove mock data and replace with real data fetch
 const AdminDashboard = () => {
@@ -27,28 +28,29 @@ const AdminDashboard = () => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
   
-  // Fetch data from Supabase
+  // Fetch data from Supabase and sync with other components
   useEffect(() => {
+    // Add a listener for user updates from other components
+    const removeUserUpdateListener = addListener('userUpdate', (userStats) => {
+      console.log('Dashboard received user update:', userStats);
+      setStats(prevStats => ({
+        ...prevStats,
+        users: userStats
+      }));
+    });
+    
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch actual users data
-        const { data: usersData, error: usersError } = await supabase
-          .from('profiles')
-          .select('id');
-          
-        if (usersError) throw usersError;
+        // Get user statistics from our centralized service
+        // This includes both database users and local test users
+        const userStats = await getUserStats();
+        console.log('User stats from service:', userStats);
         
-        // Count of total users
-        const totalUsers = usersData?.length || 0;
-        
-        // For active users, we could look at recent activity or logins
-        // For this example, we'll estimate active users as 75% of total
-        const activeUsers = Math.round(totalUsers * 0.75);
-        
-        // For new users, we could look at recently created profiles
-        // For now, we'll use a placeholder of 5% of total as new
-        const newUsers = Math.round(totalUsers * 0.05);
+        // Use the total from our service which includes test users
+        const totalUsers = userStats.total;
+        const activeUsers = userStats.active;
+        const newUsers = userStats.new;
         
         // Fetch task stats
         const { data: tasksData, error: tasksError } = await supabase
@@ -191,6 +193,11 @@ const AdminDashboard = () => {
     };
 
     fetchData();
+    
+    // Clean up event listeners when component unmounts
+    return () => {
+      removeUserUpdateListener();
+    };
   }, []);
 
   // Quick summary cards for dashboard

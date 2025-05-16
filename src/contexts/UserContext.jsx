@@ -840,15 +840,24 @@ export const UserProvider = ({ children }) => {
   const generateTelegramReferralLink = useCallback(() => {
     if (!user) return null;
     
+    // Determine the appropriate user ID to use
+    // Try different potential ID fields based on user source
+    const userId = user.telegram_id || user.id || user.user_id || null;
+    
+    if (!userId) {
+      console.warn('No valid user ID found for referral link generation');
+      return 'https://t.me/test_user?start=demo';
+    }
+    
     // Check if we're in a Telegram WebApp context
     if (window.Telegram?.WebApp) {
       // Get bot username from Telegram WebApp if available
       const botUsername = window.Telegram.WebApp.initDataUnsafe?.user?.username || 'goldenglow_bot';
-      return `https://t.me/${botUsername}?start=${user.id}`;
+      return `https://t.me/${botUsername}?start=${userId}`;
     } else {
       // Fallback to web URL with ref parameter if not in Telegram
       const baseUrl = window.location.origin;
-      return `${baseUrl}?ref=${user.id}`;
+      return `${baseUrl}?ref=${userId}`;
     }
   }, [user]);
   

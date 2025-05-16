@@ -228,6 +228,7 @@ const tryPort = (port) => {
   });
 };
 
+// For Render.com and other cloud providers
 const initialPort = process.env.PORT || 3001;
 
 tryPort(initialPort).catch(err => {

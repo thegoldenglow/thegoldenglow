@@ -286,22 +286,43 @@ export const RewardProvider = ({ children }) => {
       }));
     }
     
-    // Select segment based on probability
-    let selectedSegment = null;
-    const roll = Math.random();
-    let cumulativeProbability = 0;
+    // Check if this is a first-time player (no spin history)
+    const isFirstTimeSpin = wheelOfDestiny.history.length === 0 && !wheelOfDestiny.currentSpin;
     
-    for (const segment of wheelOfDestiny.segments) {
-      cumulativeProbability += segment.probability;
-      if (roll <= cumulativeProbability) {
-        selectedSegment = segment;
-        break;
+    let selectedSegment = null;
+    
+    if (isFirstTimeSpin) {
+      // For first-time players, guarantee an attractive prize
+      // Select from higher value segments (50, 100, or 250 GC)
+      const attractivePrizes = wheelOfDestiny.segments.filter(segment => 
+        segment.value >= 50 && segment.value <= 250
+      );
+      
+      if (attractivePrizes.length > 0) {
+        // Pick a random attractive prize
+        const randomIndex = Math.floor(Math.random() * attractivePrizes.length);
+        selectedSegment = attractivePrizes[randomIndex];
+        console.log('First-time player! Awarded an attractive prize:', selectedSegment.label);
       }
     }
     
-    // If no segment was selected (shouldn't happen normally), use the last one
+    // If not a first-time player or if no attractive prizes were found, use normal probability
     if (!selectedSegment) {
-      selectedSegment = wheelOfDestiny.segments[wheelOfDestiny.segments.length - 1];
+      const roll = Math.random();
+      let cumulativeProbability = 0;
+      
+      for (const segment of wheelOfDestiny.segments) {
+        cumulativeProbability += segment.probability;
+        if (roll <= cumulativeProbability) {
+          selectedSegment = segment;
+          break;
+        }
+      }
+      
+      // If no segment was selected (shouldn't happen normally), use the last one
+      if (!selectedSegment) {
+        selectedSegment = wheelOfDestiny.segments[wheelOfDestiny.segments.length - 1];
+      }
     }
     
     // Create spin result

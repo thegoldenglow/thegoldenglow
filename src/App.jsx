@@ -11,6 +11,7 @@ import HomePage from './components/pages/HomePage';
 import ProfilePage from './components/pages/ProfilePage';
 import DailyTasksPage from './components/pages/DailyTasksPage';
 import RewardsPage from './components/pages/RewardsPage';
+import ReferralPage from './components/pages/ReferralPage';
 
 // Import game components
 import MarksOfDestinyGame from './games/MarksOfDestiny/MarksOfDestinyGame';
@@ -174,6 +175,7 @@ function App() {
                           <Route path="/profile" element={<ProfilePage />} />
                           <Route path="/daily-tasks" element={<DailyTasksPage />} />
                           <Route path="/rewards" element={<RewardsPage />} />
+                          <Route path="/referral" element={<ReferralPage />} />
                           
                           {/* Game Routes */}
                           <Route path="/games/marks-of-destiny" element={<MarksOfDestinyGame />} />

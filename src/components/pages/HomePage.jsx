@@ -229,10 +229,10 @@ const HomePage = () => {
             </p>
           </motion.div>
           
-          {/* Rewards button */}
+          {/* Rewards and Referral buttons */}
           {user && (
             <motion.div
-              className="mt-6 mb-4"
+              className="mt-6 mb-4 space-y-3"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.4 }}
@@ -255,6 +255,19 @@ const HomePage = () => {
                     Free Spin Available!
                   </span>
                 )}
+              </Button>
+              
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={() => navigate('/referral')}
+                className="flex items-center justify-center space-x-2"
+              >
+                <span className="mr-2">👥</span>
+                <span>Invite Friends & Earn Rewards</span>
+                <span className="ml-2 bg-deepLapis px-2 py-0.5 rounded-full text-xs text-ancientGold">
+                  NEW!
+                </span>
               </Button>
             </motion.div>
           )}

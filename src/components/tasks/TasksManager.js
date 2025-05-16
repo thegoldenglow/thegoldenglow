@@ -2,6 +2,7 @@ import { StorageManager } from './StorageManager';
 import { AdManager } from './AdManager';
 import { SyncTasksService } from './SyncTasksService';
 import { generateTasks, checkAndUpdateStreak, getDefaultUserStats } from '../../utils/taskUtils';
+import { v4 as uuidv4 } from 'uuid';
 
 export class TasksManager {
   constructor(dispatch) {
@@ -28,57 +29,110 @@ export class TasksManager {
 
   async loadTasks() {
     try {
+      // Log environment for debugging
+      console.log('Environment:', import.meta.env.MODE);
+      console.log('TasksManager.loadTasks() called at:', new Date().toISOString());
+      
       // Try to load from emergency cache first (from our simplified SyncTasksService)
       const emergencyTasks = localStorage.getItem('emergency_tasks');
       
       if (emergencyTasks) {
         try {
           const parsedTasks = JSON.parse(emergencyTasks);
-          console.log('Using emergency tasks from cache:', parsedTasks.length);
+          console.log('▶️ Using emergency tasks from cache:', parsedTasks.length);
+          
+          if (parsedTasks.length === 0) {
+            console.warn('⚠️ Emergency tasks cache exists but is empty - will fall back to generated tasks');
+            throw new Error('Empty emergency tasks cache');
+          }
           
           // Convert to the expected format
           const formattedTasks = parsedTasks.map(task => ({
-            id: task.id.toString(),
-            title: task.title,
-            description: task.description,
+            id: task.id?.toString() || uuidv4(),
+            title: task.title || 'Unknown Task',
+            description: task.description || 'Task details unavailable',
             type: task.type || 'Daily', 
-            targetGame: null,
-            requirement: 1,
-            progress: 0,
-            completed: false,
-            claimed: false,
-            adBoostAvailable: true,
-            expiresAt: new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+            targetGame: task.target_game || null,
+            requirement: Number(task.requirement) || 1,
+            progress: Number(task.progress) || 0,
+            completed: Boolean(task.completed) || false,
+            claimed: Boolean(task.claimed) || false,
+            adBoostAvailable: task.ad_boost_available !== false, // Default to true
+            expiresAt: task.expires_at || new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
             rewards: [
               {
-                type: 'MYSTIC_COINS',
-                amount: parseFloat(task.reward) || 10
+                type: task.reward_type || 'MYSTIC_COINS',
+                amount: Number(task.reward_amount || task.reward) || 10
               }
             ]
           }));
+          
+          console.log('▶️ Sample formatted task:', JSON.stringify(formattedTasks[0], null, 2));
           
           this.taskList = formattedTasks;
           this.dispatch({ type: 'TASKS_LOADED', payload: formattedTasks });
           
           // Also try to sync in the background
-          this.syncService.syncFromSupabase().catch(e => console.warn('Background sync failed:', e));
+          console.log('▶️ Attempting background sync with Supabase...');
+          this.syncService.syncFromSupabase()
+            .then(success => {
+              console.log(success ? '✅ Background sync successful!' : '⚠️ Background sync returned false');
+            })
+            .catch(e => console.warn('⚠️ Background sync failed:', e));
           
           return;
         } catch (parseError) {
-          console.error('Error parsing emergency tasks:', parseError);
+          console.error('❌ Error parsing emergency tasks:', parseError);
+          // Continue to fallback
         }
+      } else {
+        console.log('⚠️ No emergency tasks found in localStorage');
+      }
+      
+      // Before falling back to mocks, try a direct Supabase sync
+      try {
+        console.log('▶️ Attempting direct Supabase sync before generating mock tasks...');
+        const syncSuccess = await this.syncService.syncFromSupabase();
+        
+        if (syncSuccess) {
+          console.log('✅ Direct Supabase sync successful!');
+          // Now try to load from emergency cache again (should be populated by the sync)
+          const freshEmergencyTasks = localStorage.getItem('emergency_tasks');
+          
+          if (freshEmergencyTasks) {
+            const parsedFreshTasks = JSON.parse(freshEmergencyTasks);
+            if (parsedFreshTasks && parsedFreshTasks.length > 0) {
+              console.log('✅ Successfully loaded fresh tasks from Supabase!', parsedFreshTasks.length);
+              
+              // The rest of the processing will happen in the next page load
+              // Force a page reload to get the fresh tasks
+              window.location.reload();
+              return;
+            }
+          }
+        } else {
+          console.warn('⚠️ Direct Supabase sync failed, will use mock tasks');
+        }
+      } catch (syncError) {
+        console.error('❌ Error during direct Supabase sync:', syncError);
+        // Continue to fallback
       }
       
       // Fallback to generating tasks if we don't have any cached tasks
-      console.log('No emergency tasks found, generating local tasks...');
+      console.log('▶️ Generating mock tasks as last resort...');
       const tasks = generateTasks();
       this.taskList = tasks;
       this.dispatch({ type: 'TASKS_LOADED', payload: tasks });
       
-      // Try syncing in the background for next reload
-      this.syncService.syncFromSupabase().catch(e => console.warn('Background sync failed:', e));
+      // Schedule another sync attempt for the future
+      setTimeout(() => {
+        console.log('▶️ Attempting delayed background sync...');
+        this.syncService.syncFromSupabase()
+          .then(success => console.log(success ? '✅ Delayed sync successful' : '⚠️ Delayed sync returned false'))
+          .catch(e => console.warn('⚠️ Delayed sync failed:', e));
+      }, 5000); // Try again after 5 seconds
     } catch (error) {
-      console.error('Error loading tasks:', error);
+      console.error('❌ Unhandled error in loadTasks:', error);
       this.dispatch({ type: 'SET_ERROR', payload: 'Failed to load tasks' });
     }
   }

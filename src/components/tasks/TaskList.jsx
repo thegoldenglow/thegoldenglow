@@ -1,11 +1,113 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import TaskItem from './TaskItem';
 
-const TaskList = ({ tasks, onNavigate, onClaim, onAdBoost }) => {
+const TaskList = ({ tasks = [], onNavigate, onClaim, onAdBoost }) => {
+  const [displayTasks, setDisplayTasks] = useState([]);
+  
+  // Generate fallback tasks if none are provided
+  useEffect(() => {
+    // If we have real tasks, use them
+    if (tasks && tasks.length > 0) {
+      console.log('TaskList: Using provided tasks:', tasks.length);
+      setDisplayTasks(tasks);
+      return;
+    }
+    
+    // Try to load from emergency cache
+    try {
+      const emergencyTasks = localStorage.getItem('emergency_tasks');
+      if (emergencyTasks) {
+        const parsedTasks = JSON.parse(emergencyTasks);
+        if (parsedTasks && parsedTasks.length > 0) {
+          console.log('TaskList: Using emergency tasks from localStorage:', parsedTasks.length);
+          
+          // Convert to the expected format if necessary
+          const formattedTasks = parsedTasks.map(task => ({
+            id: task.id?.toString() || String(Math.random()),
+            title: task.title || 'Unknown Task',
+            description: task.description || 'Task details unavailable',
+            type: task.type || 'DAILY_LOGIN', 
+            targetGame: task.target_game || null,
+            requirement: Number(task.requirement) || 1,
+            progress: Number(task.progress) || 0,
+            completed: Boolean(task.completed) || false,
+            claimed: Boolean(task.claimed) || false,
+            adBoostAvailable: task.ad_boost_available !== false,
+            expiresAt: task.expires_at || new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+            rewards: [
+              {
+                type: task.reward_type || 'MYSTIC_COINS',
+                amount: Number(task.reward_amount || task.reward) || 10
+              }
+            ]
+          }));
+          
+          setDisplayTasks(formattedTasks);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Error loading emergency tasks in TaskList:', err);
+    }
+    
+    // Last resort: Generate default tasks
+    console.log('TaskList: Generating fallback tasks');
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    
+    const fallbackTasks = [
+      {
+        id: 'default-1',
+        title: "Complete daily login",
+        description: "Log in to Golden Glow every day to maintain your streak",
+        type: "DAILY_LOGIN",
+        targetGame: null,
+        requirement: 1,
+        progress: 1, // Auto-completed when opening the app
+        completed: true,
+        claimed: false,
+        adBoostAvailable: true,
+        expiresAt: tomorrow.toISOString(),
+        rewards: [{ type: 'MYSTIC_COINS', amount: 100 }]
+      },
+      {
+        id: 'default-2',
+        title: "Play Marks of Destiny",
+        description: "Play 3 rounds of Tic-Tac-Toe",
+        type: "GAME_SPECIFIC",
+        targetGame: "marks-of-destiny",
+        requirement: 3,
+        progress: 0,
+        completed: false,
+        claimed: false,
+        adBoostAvailable: true,
+        expiresAt: tomorrow.toISOString(),
+        rewards: [{ type: 'MYSTIC_COINS', amount: 75 }]
+      },
+      {
+        id: 'default-3',
+        title: "Complete all daily tasks",
+        description: "Finish all available tasks for today",
+        type: "ACHIEVEMENT",
+        targetGame: null,
+        requirement: 1,
+        progress: 0,
+        completed: false,
+        claimed: false,
+        adBoostAvailable: true,
+        expiresAt: tomorrow.toISOString(),
+        rewards: [{ type: 'MYSTIC_COINS', amount: 150 }]
+      }
+    ];
+    
+    setDisplayTasks(fallbackTasks);
+  }, [tasks]);
+  
   // Separate tasks into completed but not claimed, incomplete, and claimed
-  const completedNotClaimed = tasks.filter(task => task.completed && !task.claimed);
-  const notCompleted = tasks.filter(task => !task.completed);
-  const claimed = tasks.filter(task => task.claimed);
+  const completedNotClaimed = displayTasks.filter(task => task.completed && !task.claimed);
+  const notCompleted = displayTasks.filter(task => !task.completed);
+  const claimed = displayTasks.filter(task => task.claimed);
   
   // Sort tasks by priority order
   const sortedTasks = [

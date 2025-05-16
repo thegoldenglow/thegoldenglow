@@ -17,12 +17,12 @@ export class SyncTasksService {
     return [
       {
         id: 1,
-        title: "Complete daily login",
-        description: "Log in to Golden Glow every day to maintain your streak",
+        title: "Daily Meditation",
+        description: "Spend a few moments in quiet reflection",
         type: "DAILY_LOGIN",
         status: "Active",
         requirement: 1,
-        progress: 0,
+        progress: 1, // Auto-completed
         reward: 100,
         reward_type: "MYSTIC_COINS",
         target_game: null,
@@ -30,26 +30,13 @@ export class SyncTasksService {
       },
       {
         id: 2,
-        title: "Play Marks of Destiny",
-        description: "Play 3 rounds of Tic-Tac-Toe",
-        type: "GAME_SPECIFIC",
-        status: "Active",
-        requirement: 3,
-        progress: 0,
-        reward: 75,
-        reward_type: "MYSTIC_COINS",
-        target_game: "marks-of-destiny",
-        expires_at: tomorrow.toISOString()
-      },
-      {
-        id: 3,
-        title: "Complete all daily tasks",
-        description: "Finish all available tasks for today",
-        type: "ACHIEVEMENT",
+        title: "Explore Game Collection",
+        description: "Browse through our collection of mystical games",
+        type: "EXPLORATION",
         status: "Active",
         requirement: 1,
         progress: 0,
-        reward: 150,
+        reward: 75,
         reward_type: "MYSTIC_COINS",
         target_game: null,
         expires_at: tomorrow.toISOString()

@@ -50,7 +50,7 @@ const TaskList = ({ tasks = [], onNavigate, onClaim, onAdBoost }) => {
       console.error('Error loading emergency tasks in TaskList:', err);
     }
     
-    // Last resort: Generate default tasks
+    // Last resort: Generate simpler default tasks
     console.log('TaskList: Generating fallback tasks');
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -59,8 +59,8 @@ const TaskList = ({ tasks = [], onNavigate, onClaim, onAdBoost }) => {
     const fallbackTasks = [
       {
         id: 'default-1',
-        title: "Complete daily login",
-        description: "Log in to Golden Glow every day to maintain your streak",
+        title: "Daily Meditation",
+        description: "Spend a few moments in quiet reflection",
         type: "DAILY_LOGIN",
         targetGame: null,
         requirement: 1,
@@ -73,23 +73,9 @@ const TaskList = ({ tasks = [], onNavigate, onClaim, onAdBoost }) => {
       },
       {
         id: 'default-2',
-        title: "Play Marks of Destiny",
-        description: "Play 3 rounds of Tic-Tac-Toe",
-        type: "GAME_SPECIFIC",
-        targetGame: "marks-of-destiny",
-        requirement: 3,
-        progress: 0,
-        completed: false,
-        claimed: false,
-        adBoostAvailable: true,
-        expiresAt: tomorrow.toISOString(),
-        rewards: [{ type: 'MYSTIC_COINS', amount: 75 }]
-      },
-      {
-        id: 'default-3',
-        title: "Complete all daily tasks",
-        description: "Finish all available tasks for today",
-        type: "ACHIEVEMENT",
+        title: "Explore Game Collection",
+        description: "Browse through our collection of mystical games",
+        type: "EXPLORATION",
         targetGame: null,
         requirement: 1,
         progress: 0,
@@ -97,7 +83,7 @@ const TaskList = ({ tasks = [], onNavigate, onClaim, onAdBoost }) => {
         claimed: false,
         adBoostAvailable: true,
         expiresAt: tomorrow.toISOString(),
-        rewards: [{ type: 'MYSTIC_COINS', amount: 150 }]
+        rewards: [{ type: 'MYSTIC_COINS', amount: 75 }]
       }
     ];
     

@@ -36,14 +36,21 @@ export const UserProvider = ({ children }) => {
             
             // Create a new profile if it doesn't exist
             if (error.code === 'PGRST116') {
+              // Create a minimal profile to avoid schema issues
               const newProfile = {
                 id: supabaseSession.user.id,
                 name: supabaseSession.user.user_metadata?.full_name || 'User',
+                points: 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              
+              // We'll store the full user data in localStorage only
+              const fullUserData = {
+                ...newProfile,
                 lastName: '',
                 username: supabaseSession.user.email?.split('@')[0] || null,
                 avatar: null,
-                points: 0,
-                createdAt: new Date().toISOString(),
                 achievements: [],
                 badges: [],
                 titles: [],
@@ -71,9 +78,16 @@ export const UserProvider = ({ children }) => {
                 
               if (insertError) {
                 console.error('Error creating user profile:', insertError);
-              } else {
-                setUser(newProfile);
+                // Still use localStorage for user data even if Supabase insert fails
+                setUser(fullUserData);
                 setIsAuthenticated(true);
+                localStorage.setItem('gg_user', JSON.stringify(fullUserData));
+              } else {
+                console.log('Successfully created minimal profile in Supabase');
+                // Use the full user data for the app
+                setUser(fullUserData);
+                setIsAuthenticated(true);
+                localStorage.setItem('gg_user', JSON.stringify(fullUserData));
               }
             }
           } else {

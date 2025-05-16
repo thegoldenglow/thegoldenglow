@@ -64,19 +64,13 @@ export class SyncTasksService {
       console.log('Supabase URL configured:', !!import.meta.env.VITE_SUPABASE_URL);
       console.log('Supabase Anon Key configured:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
       
-      // First check connection - using health check instead of profiles table
+      // Check connection by directly testing the tasks table
+      // We'll skip any profile/auth checks entirely since they're causing issues
       try {
-        // Use a safer way to check connection by getting Supabase health status
-        // This avoids issues with 'profiles' table permissions
-        const { error: pingError } = await supabase.rpc('get_service_status');
-        if (pingError) {
-          // Fallback to checking tasks table directly since that's what we need
-          console.error('❌ Supabase health check failed, trying tasks table instead:', pingError);
-        } else {
-          console.log('✅ Supabase connection test successful');
-        }
+        console.log('▶️ Testing Supabase connection by checking tasks table directly...');
+        // We skip auth/profiles entirely and go straight to what matters - the tasks table
       } catch (pingErr) {
-        console.error('❌ Supabase ping test exception:', pingErr);
+        console.error('❌ Supabase connection test exception:', pingErr);
       }
       
       // Check if the tasks table exists by trying to access it

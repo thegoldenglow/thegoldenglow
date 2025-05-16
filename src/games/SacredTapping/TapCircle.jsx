@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 
 const TapCircle = ({ circle, onTap }) => {
-  const { id, x, y, size, type, tapped, tapQuality } = circle;
+  const { id, x, y, size, type, tapped, tapQuality, speedMultiplier = 1 } = circle;
   
   // Determine circle colors based on type and state
   const getCircleColors = () => {
@@ -59,7 +59,7 @@ const TapCircle = ({ circle, onTap }) => {
   
   const colors = getCircleColors();
   
-  // Animation variants
+  // Animation variants - adjust speed based on the speedMultiplier
   const circleVariants = {
     initial: {
       opacity: 0,
@@ -69,7 +69,7 @@ const TapCircle = ({ circle, onTap }) => {
       opacity: 1,
       scale: [0.9, 1.05, 0.95, 1],
       transition: {
-        duration: 0.5,
+        duration: 0.5 / (speedMultiplier || 1),
         ease: "easeOut"
       }
     },
@@ -82,7 +82,7 @@ const TapCircle = ({ circle, onTap }) => {
         `0 0 10px ${colors.glow}`,
       ],
       transition: {
-        duration: 1.5,
+        duration: 1.5 / (speedMultiplier || 1),
         repeat: Infinity,
         repeatType: "reverse"
       }

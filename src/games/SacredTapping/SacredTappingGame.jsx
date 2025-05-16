@@ -35,15 +35,23 @@ const SacredTappingGame = () => {
   
   // Game mechanics constants
   const MAX_CIRCLES = 5; // Maximum number of circles on screen
-  const CIRCLE_SPAWN_INTERVAL = {
+  const BASE_CIRCLE_SPAWN_INTERVAL = {
     easy: 2000,
     normal: 1500,
     hard: 1000
   };
-  const CIRCLE_LIFETIME = {
+  const BASE_CIRCLE_LIFETIME = {
     easy: 3000,
     normal: 2500,
     hard: 2000
+  };
+  
+  // Calculate speed multiplier based on remaining time
+  const getSpeedMultiplier = (timeRemaining) => {
+    // Start increasing speed when 45 seconds remain
+    // Max multiplier of 2x (twice as fast) at end of game
+    if (timeRemaining >= 45) return 1;
+    return 1 + ((45 - timeRemaining) / 45);
   };
   const PERFECT_TAP_THRESHOLD = 300; // ms within which a tap is considered "perfect"
   const GOOD_TAP_THRESHOLD = 600; // ms within which a tap is considered "good"
@@ -89,10 +97,11 @@ const SacredTappingGame = () => {
       setTimeout(() => setRewardNotification(null), 3000);
     }
     
-    // Start spawning circles
+    // Start spawning circles with initial rate
+    const initialRate = BASE_CIRCLE_SPAWN_INTERVAL[selectedDifficulty];
     const intervalId = setInterval(() => {
-      spawnCircle(selectedDifficulty);
-    }, CIRCLE_SPAWN_INTERVAL[selectedDifficulty]);
+      spawnCircle(selectedDifficulty, 60); // Initial gameTime is 60
+    }, initialRate);
     setSpawnInterval(intervalId);
     
     // Start game timer
@@ -105,7 +114,28 @@ const SacredTappingGame = () => {
           endGame();
           return 0;
         }
-        return prevTime - 1;
+        
+        const newTime = prevTime - 1;
+        
+        // Adjust spawn rate every 5 seconds as time decreases
+        if (newTime % 5 === 0 || newTime === 45 || newTime === 30 || newTime === 15) {
+          // Clear existing interval
+          clearInterval(intervalId);
+          
+          // Calculate new interval based on remaining time
+          const speedMultiplier = getSpeedMultiplier(newTime);
+          const newRate = Math.floor(BASE_CIRCLE_SPAWN_INTERVAL[selectedDifficulty] / speedMultiplier);
+          
+          // Set new spawn interval with adjusted rate
+          const newIntervalId = setInterval(() => {
+            spawnCircle(selectedDifficulty, newTime);
+          }, newRate);
+          
+          // Update the interval reference
+          setSpawnInterval(newIntervalId);
+        }
+        
+        return newTime;
       });
     }, 1000);
     setGameTimer(timerId);
@@ -211,7 +241,7 @@ const SacredTappingGame = () => {
   };
   
   // Spawn a new circle
-  const spawnCircle = (difficultyLevel) => {
+  const spawnCircle = (difficultyLevel, timeRemaining) => {
     // Don't spawn if maximum circles reached
     if (circles.length >= MAX_CIRCLES) return;
     
@@ -226,6 +256,12 @@ const SacredTappingGame = () => {
     const x = margin + Math.random() * (width - 2 * margin);
     const y = margin + Math.random() * (height - 2 * margin);
     
+    // Calculate speed multiplier based on remaining time
+    const speedMultiplier = getSpeedMultiplier(timeRemaining);
+    
+    // Adjust lifetime based on speed multiplier
+    const adjustedLifetime = Math.floor(BASE_CIRCLE_LIFETIME[difficultyLevel] / speedMultiplier);
+    
     // Generate circle data
     const newCircle = {
       id: `circle-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -233,8 +269,9 @@ const SacredTappingGame = () => {
       y,
       size: Math.floor(Math.random() * 30) + 50, // Random size between 50-80px
       createdAt: Date.now(),
-      lifetime: CIRCLE_LIFETIME[difficultyLevel],
+      lifetime: adjustedLifetime,
       tapped: false,
+      speedMultiplier, // Store the speed multiplier for animation reference
       type: Math.random() > 0.8 ? 'golden' : 'normal' // 20% chance for golden (bonus) circles
     };
     
@@ -567,6 +604,7 @@ const SacredTappingGame = () => {
                     exit={{ opacity: 0, scale: 0.9 }}
                   >
                     <p className="text-royalGold text-lg font-primary">Tap the circles when they pulse!</p>
+                    <p className="text-royalGold/80 text-sm font-primary mt-1">Circles speed up as time decreases!</p>
                   </motion.div>
                 </div>
               )}
@@ -578,6 +616,8 @@ const SacredTappingGame = () => {
                 {gameOver ? (
                   `Game Over! ${score > highScore ? 'New High Score!' : 'Well played!'}`
                 ) : (
+                  gameTime <= 30 ? 
+                  `Circles speeding up! ${gameTime <= 15 ? 'Final rush!' : ''}` : 
                   'Tap the circles as they reach their brightest moment'
                 )}
               </p>

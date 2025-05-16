@@ -5,6 +5,7 @@ import TaskList from '../tasks/TaskList';
 import StreakCalendar from '../tasks/StreakCalendar';
 import RewardDisplay from '../tasks/RewardDisplay';
 import AdRewardModal from '../tasks/AdRewardModal';
+import DebugSupabase from '../debug/DebugSupabase';
 import { getNextMilestone, getTimeUntilExpiration } from '../../utils/taskUtils';
 
 const DailyTasksPage = () => {
@@ -12,6 +13,7 @@ const DailyTasksPage = () => {
   const [timeUntilReset, setTimeUntilReset] = useState('');
   const [showAdModal, setShowAdModal] = useState(false);
   const [currentTaskForAd, setCurrentTaskForAd] = useState(null);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
   const navigate = useNavigate();
 
   // Update the countdown timer every minute
@@ -126,6 +128,14 @@ const DailyTasksPage = () => {
       <div className="mt-8">
         <RewardDisplay userStats={state.userStats} />
       </div>
+      
+      {/* Debug Section - Hidden by default */}
+      {showDebugInfo && (
+        <div className="mt-8 border-t-2 border-royalGold/30 pt-4">
+          <h2 className="text-2xl font-primary text-textGold mb-4">Debug Info</h2>
+          <DebugSupabase />
+        </div>
+      )}
       
       {/* Ad Modal */}
       {showAdModal && (

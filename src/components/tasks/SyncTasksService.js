@@ -135,12 +135,31 @@ export class SyncTasksService {
       
       // Store a simplified copy in localStorage for emergency access
       if (supabaseTasks && supabaseTasks.length > 0) {
-        localStorage.setItem('emergency_tasks', JSON.stringify(supabaseTasks));
-        console.log('✅ Tasks saved to emergency_tasks in localStorage');
+        // Mark these tasks explicitly as real data from Supabase
+        const taggedTasks = supabaseTasks.map(task => ({
+          ...task,
+          is_real_data: true  // Special flag to identify real data
+        }));
+        localStorage.setItem('emergency_tasks', JSON.stringify(taggedTasks));
+        localStorage.setItem('last_real_data_sync', new Date().toISOString());
+        console.log('✅ REAL Supabase tasks saved to emergency_tasks in localStorage:', taggedTasks.length);
         return true;
       } else {
-        console.warn('⚠️ No tasks saved to emergency_tasks (empty result)');
-        return false;
+        // Only use mock tasks if we've never had real data before
+        const lastRealSync = localStorage.getItem('last_real_data_sync');
+        if (!lastRealSync) {
+          console.warn('⚠️ No tasks in Supabase. Using mock tasks as initial data only.');
+          const mockTasks = this.generateMockTasks().map(task => ({
+            ...task,
+            is_real_data: false // Mark as mock data
+          }));
+          localStorage.setItem('emergency_tasks', JSON.stringify(mockTasks));
+          return true;
+        } else {
+          console.warn('⚠️ Empty result from Supabase, but we had real data before. Not overwriting with mocks.');
+          // Keep existing emergency_tasks intact - don't replace with mocks!
+          return false;
+        }
       }
 
     } catch (error) {

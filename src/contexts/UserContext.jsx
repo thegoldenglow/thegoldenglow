@@ -551,78 +551,71 @@ export const UserProvider = ({ children }) => {
   };
 
   // Update user points (Golden Credits) and optionally additional user data in a single update
-  const updateUserPoints = async (points, additionalData = null) => {
-    if (!user) return;
+  const updateUserPoints = useCallback(async (points, additionalData = null) => {
+    if (!user) return false;
     
-    const updatedUser = {
-      ...user,
-      points: Math.max(0, user.points + points) // Ensure points don't go negative
+    let newPoints = user.points + points;
+    if (newPoints < 0) newPoints = 0; // Prevent negative points
+    
+    // Create an update object with the points and any additional data
+    const updates = {
+      ...additionalData,
+      points: newPoints,
+      updatedAt: new Date().toISOString()
     };
     
-    // Handle additional data if provided (like progress updates)
-    if (additionalData) {
-      if (additionalData.progress) {
-        updatedUser.progress = {
-          ...(updatedUser.progress || {}),
-          ...additionalData.progress
-        };
-      }
-      
-      // Handle any other additional data fields here
-    }
-    
-    // Update in Supabase database for both Telegram and non-Telegram users
-    // Check if we have telegram_id or regular id to identify the user
     let updateSuccess = false;
     
-    if (user.telegram_id) {
-      // Update by telegram_id
-      const { error } = await supabase
-        .from('profiles')
-        .update({ points: updatedUser.points })
-        .eq('telegram_id', user.telegram_id);
+    // Try to update in Supabase if we have a user ID
+    if (user.id) {
+      try {
+        console.log('Updating user points in Supabase:', { userId: user.id, points: newPoints });
         
-      if (error) {
-        console.error('Error updating Telegram user points in Supabase:', error);
-      } else {
-        updateSuccess = true;
-      }
-    } else if (user.id) {
-      // Check if this is a UUID (for Supabase users) or other ID
-      const idField = user.user_id ? 'user_id' : 'id';
-      const { error } = await supabase
-        .from('profiles')
-        .update({ points: updatedUser.points })
-        .eq(idField, user[idField]);
-        
-      if (error) {
-        console.error(`Error updating user points in Supabase using ${idField}:`, error);
-      } else {
-        updateSuccess = true;
+        // First try with regular ID
+        const { error } = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', user.id);
+          
+        if (error) {
+          console.error('Error updating user points in Supabase:', error.message);
+          
+          // Check if we should try with telegram_id instead
+          if (user.telegram_id) {
+            console.log('Trying update with telegram_id instead');
+            const { error: telegramError } = await supabase
+              .from('profiles')
+              .update(updates)
+              .eq('telegram_id', user.telegram_id);
+              
+            if (telegramError) {
+              console.error('Error updating with telegram_id:', telegramError.message);
+            } else {
+              updateSuccess = true;
+            }
+          }
+        } else {
+          updateSuccess = true;
+        }
+      } catch (e) {
+        console.error('Exception during Supabase update:', e);
       }
     }
+    
+    // Always update local state regardless of Supabase result
+    const updatedUser = { ...user, ...updates };
+    
+    // Update local state in a single operation
+    setUser(updatedUser);
+    localStorage.setItem('gg_user', JSON.stringify(updatedUser));
     
     // Log if we didn't succeed in updating the database
     if (!updateSuccess) {
       console.warn('Could not update user points in database, only updated in localStorage');
     }
     
-    // Update local state in a single operation
-    setUser(updatedUser);
-    localStorage.setItem('gg_user', JSON.stringify(updatedUser));
-    
-    // If this earned points from a referral, award the referrer a bonus
-    if (points > 0) {
-      const referredBy = localStorage.getItem('gg_referred_by');
-      if (referredBy) {
-        // Earn 5% bonus for the referrer on first 1000 GC earned
-        // This would normally be handled server-side in a real implementation
-        console.log('Calculating referral bonus for:', referredBy);
-      }
-    }
-    
     return updatedUser.points;
-  };
+  }, [user]);
 
   // Update user stats
   const updateUserStats = (stats) => {

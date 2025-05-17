@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
 import { FiPlus, FiEdit2, FiSave, FiX, FiRefreshCw } from 'react-icons/fi';
-import { loadAllUsers, createTestUser, updateUserPoints } from '../../utils/userManager';
+import { loadAllUsers, createRealUser, updateUserPoints } from '../../utils/userManager';
 import { notifyListeners, refreshUserData } from '../../utils/adminDataService';
 
 const UserManagement = () => {
@@ -136,10 +136,11 @@ const UserManagement = () => {
       setNewUser({
         name: '',
         username: '',
+        bio: '',
         email: '',
         points: 0,
         status: 'active',
-        role: 'user',
+        role: 'regular', // Changed from 'user' to 'regular' to match Supabase schema
       });
     }
   };
@@ -153,7 +154,7 @@ const UserManagement = () => {
     });
   };
   
-  // Add test user - creates a simulated user in local storage only
+  // Add a real user - creates a user in Supabase database
   const handleAddTestUser = async () => {
     setSaveError(null);
     try {
@@ -161,22 +162,23 @@ const UserManagement = () => {
         throw new Error('Username is required');
       }
       
-      console.log('Creating test user with userManager utility');
+      console.log('Creating real user in Supabase database');
       
-      // Use our utility to create a test user in local storage
-      const { user: createdUser, error: createError } = await createTestUser({
+      // Use our utility to create a real user in Supabase
+      const { user: createdUser, error: createError } = await createRealUser({
         username: newUser.username,
-        name: newUser.name,
+        bio: newUser.bio || `${newUser.username}'s profile`,
         points: newUser.points,
         role: newUser.role,
-        status: newUser.status
+        status: newUser.status,
+        email: newUser.email
       });
       
       if (createError) {
         throw new Error(createError);
       }
       
-      console.log('Test user created successfully:', createdUser);
+      console.log('Real user created successfully in Supabase:', createdUser);
       
       // Reset form and show success message
       setAddingUser(false);
@@ -268,18 +270,18 @@ const UserManagement = () => {
           </button>
           
           <button 
-            onClick={toggleAddUserForm}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-royalGold text-deepLapisDark font-semibold rounded hover:bg-royalGoldLight transition-colors w-full sm:w-auto"
+            onClick={toggleAddUserForm}
           >
-            {addingUser ? <><FiX /> Cancel</> : <><FiPlus /> Add Test User</>}
+            {addingUser ? <><FiX /> Cancel</> : <><FiPlus /> Add User to Database</>}
           </button>
         </div>
       </div>
       
-      {/* Add Test User Form */}
+      {/* Add User Form */}
       {addingUser && (
         <div className="mb-6 p-4 bg-deepLapisDark arabesque-border rounded-lg">
-          <h3 className="text-lg font-semibold text-textGold mb-3">Add Test User</h3>
+          <h3 className="text-lg font-semibold text-textGold mb-3">Add User to Database</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-textLight/80 mb-1 text-sm">Name*</label>
@@ -375,6 +377,7 @@ const UserManagement = () => {
             <thead className="text-xs text-textGold uppercase bg-deepLapisLight/30">
               <tr>
                 <th scope="col" className="px-6 py-3">User</th>
+                <th scope="col" className="px-6 py-3">Telegram</th>
                 <th scope="col" className="px-6 py-3">Role</th>
                 <th scope="col" className="px-6 py-3">Points</th>
                 <th scope="col" className="px-6 py-3">Status</th>
@@ -388,6 +391,32 @@ const UserManagement = () => {
                   <td className="px-6 py-4 font-medium whitespace-nowrap">
                     <div className="text-base text-textGold">{user.username || 'N/A'}</div>
                     <div className="text-xs text-textLight/70">{user.email || 'N/A'}</div>
+                    {user.avatar_url && (
+                      <div className="mt-1">
+                        <img 
+                          src={user.avatar_url} 
+                          alt={user.username} 
+                          className="h-8 w-8 rounded-full border border-royalGold/30" 
+                        />
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    {user.telegram_id ? (
+                      <div>
+                        <div className="text-textGold flex items-center">
+                          <svg viewBox="0 0 24 24" width="16" height="16" className="mr-1 text-blue-400">
+                            <path fill="currentColor" d="M9.78 18.65l.28-4.23l7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3L3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z" />
+                          </svg>
+                          {user.telegram_username ? `@${user.telegram_username}` : 'Connected'}
+                        </div>
+                        <div className="text-xs text-textLight/70">
+                          {[user.telegram_first_name, user.telegram_last_name].filter(Boolean).join(' ')}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-textLight/50 text-xs">Not connected</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 capitalize">{user.role || 'user'}</td>
                   <td className="px-6 py-4">

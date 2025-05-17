@@ -12,6 +12,7 @@ import ProfilePage from './components/pages/ProfilePage';
 import DailyTasksPage from './components/pages/DailyTasksPage';
 import RewardsPage from './components/pages/RewardsPage';
 import ReferralPage from './components/pages/ReferralPage';
+import LeaderboardPage from './components/pages/LeaderboardPage';
 
 // Import game components
 import MarksOfDestinyGame from './games/MarksOfDestiny/MarksOfDestinyGame';
@@ -176,6 +177,7 @@ function App() {
                           <Route path="/daily-tasks" element={<DailyTasksPage />} />
                           <Route path="/rewards" element={<RewardsPage />} />
                           <Route path="/referral" element={<ReferralPage />} />
+                          <Route path="/leaderboard" element={<LeaderboardPage />} />
                           
                           {/* Game Routes */}
                           <Route path="/games/marks-of-destiny" element={<MarksOfDestinyGame />} />

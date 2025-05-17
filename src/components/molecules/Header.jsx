@@ -115,6 +115,19 @@ const Header = ({ userName, userPoints, userLevel }) => {
                 {userName}
               </Button>
             </Link>
+            
+            {/* Leaderboard link */}
+            <Link to="/leaderboard">
+              <Button 
+                variant="outline" 
+                size="md" 
+                className="flex items-center border-royalGold/60 text-royalGold hover:bg-royalGold/20 transition-colors duration-300"
+                icon={<Icon name="trophy" size={18} />}
+                iconPosition="left"
+              >
+                Leaderboard
+              </Button>
+            </Link>
           </div>
         )}
         

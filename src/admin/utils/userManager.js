@@ -57,10 +57,18 @@ export const loadAllUsers = async (searchTerm = '') => {
         id: user.id,
         username: user.username || 'Unknown',
         points: user.points || 0,
-        role: user.role || 'user',
+        role: user.user_type || 'user',
         status: 'active', // Default status
         created_at: user.created_at || new Date().toISOString(),
-        is_db_user: true // Mark as database user
+        is_db_user: true, // Mark as database user
+        // Include Telegram data
+        telegram_id: user.telegram_id,
+        telegram_username: user.telegram_username,
+        telegram_first_name: user.telegram_first_name,
+        telegram_last_name: user.telegram_last_name,
+        telegram_photo_url: user.telegram_photo_url,
+        avatar_url: user.avatar_url || user.telegram_photo_url,
+        bio: user.bio
       })),
       ...localUsers
     ];
@@ -83,7 +91,50 @@ export const loadAllUsers = async (searchTerm = '') => {
   }
 };
 
-// Create a test user (stored in local storage)
+// Create a real user (stored in Supabase database)
+export const createRealUser = async (userData) => {
+  try {
+    if (!userData.username) {
+      throw new Error('Username is required');
+    }
+    
+    // Create user in Supabase database
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert([
+        {
+          username: userData.username,
+          bio: userData.bio || `${userData.username}'s profile`,
+          points: parseInt(userData.points) || 0,
+          user_type: userData.role || 'regular',
+          avatar_url: userData.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=0D47A1&color=fff`,
+          created_at: new Date().toISOString()
+        }
+      ])
+      .select();
+      
+    if (error) throw error;
+    
+    // Also store in local storage as backup (as per Golden Glow's dual storage approach)
+    if (data && data[0]) {
+      const newUser = data[0];
+      localStorage.setItem('gg_user', JSON.stringify(newUser));
+    }
+    
+    return {
+      user: data?.[0] || null,
+      error: null
+    };
+  } catch (err) {
+    console.error('Error creating real user:', err);
+    return {
+      user: null,
+      error: err.message
+    };
+  }
+};
+
+// Create a test user (stored in local storage only)
 export const createTestUser = async (userData) => {
   try {
     if (!userData.username) {

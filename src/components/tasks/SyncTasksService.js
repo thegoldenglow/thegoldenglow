@@ -1,171 +1,283 @@
 import { supabase } from '../../utils/supabase';
 import { StorageManager } from './StorageManager';
 
-// Enhanced SyncTasksService with better debugging
+// Enhanced SyncTasksService with comprehensive debugging
 export class SyncTasksService {
   constructor() {
     this.storageManager = new StorageManager();
+    this.dispatcher = null;
     console.log('SyncTasksService initialized');
   }
-  
-  // Generate mock tasks for when the tasks table doesn't exist
-  generateMockTasks() {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    
-    return [
-      {
-        id: 1,
-        title: "Daily Meditation",
-        description: "Spend a few moments in quiet reflection",
-        type: "DAILY_LOGIN",
-        status: "Active",
-        requirement: 1,
-        progress: 1, // Auto-completed
-        reward: 100,
-        reward_type: "MYSTIC_COINS",
-        target_game: null,
-        expires_at: tomorrow.toISOString()
-      },
-      {
-        id: 2,
-        title: "Explore Game Collection",
-        description: "Browse through our collection of mystical games",
-        type: "EXPLORATION",
-        status: "Active",
-        requirement: 1,
-        progress: 0,
-        reward: 75,
-        reward_type: "MYSTIC_COINS",
-        target_game: null,
-        expires_at: tomorrow.toISOString()
-      }
-    ];
+
+  // Set the dispatcher to update application state
+  setDispatcher(dispatcher) {
+    this.dispatcher = dispatcher;
+    console.log('Dispatcher connected:', !!dispatcher);
   }
 
-  // Enhanced version with better error handling for production debugging
+  // Check if we have a valid Supabase connection
+  async checkConnection() {
+    try {
+      console.log('Testing Supabase connection...');
+      
+      // Try fetching all tables to test connection
+      const { data, error } = await supabase
+        .rpc('get_tables');
+      
+      if (error) {
+        // If RPC fails, try a simple direct query
+        const { data: health, error: healthError } = await supabase
+          .from('profiles') // The profiles table should always exist
+          .select('count');
+        
+        if (healthError) {
+          console.error('Failed to connect to Supabase:', healthError);
+          return {
+            connected: false,
+            error: healthError
+          };
+        }
+        
+        return {
+          connected: true,
+          message: 'Connected to Supabase but RPC failed. Using direct queries.'
+        };
+      }
+      
+      return {
+        connected: true,
+        tables: data
+      };
+    } catch (err) {
+      console.error('Unexpected error checking Supabase connection:', err);
+      return {
+        connected: false,
+        error: err
+      };
+    }
+  }
+  
+  // Try different approaches to find tasks
+  async findTasksTable() {
+    try {
+      // First try the tasks table
+      const { data: taskData, error: taskError } = await supabase
+        .from('tasks')
+        .select('count');
+      
+      if (!taskError) {
+        return {
+          exists: true,
+          table: 'tasks'
+        };
+      }
+      
+      // If tasks table doesn't exist, check for task (singular)
+      const { data: singularData, error: singularError } = await supabase
+        .from('task')
+        .select('count');
+      
+      if (!singularError) {
+        return {
+          exists: true,
+          table: 'task'
+        };
+      }
+      
+      // Try to list all tables
+      console.log('Attempting to list all tables...');
+      try {
+        const { data: tables, error: tablesError } = await supabase
+          .from('pg_catalog.pg_tables')
+          .select('tablename')
+          .eq('schemaname', 'public');
+          
+        if (!tablesError && tables) {
+          console.log('Available tables:', tables);
+          return {
+            exists: false,
+            availableTables: tables.map(t => t.tablename)
+          };
+        }
+      } catch (e) {
+        console.warn('Could not list tables:', e);
+      }
+      
+      return {
+        exists: false,
+        error: 'No tasks table found'
+      };
+    } catch (err) {
+      console.error('Error finding tasks table:', err);
+      return {
+        exists: false,
+        error: err
+      };
+    }
+  }
+
+  // Enhanced version to properly load tasks with full debugging
   async syncFromSupabase() {
     try {
-      console.log('Syncing tasks from Supabase to local storage...', new Date().toISOString());
-      console.log('Supabase URL configured:', !!import.meta.env.VITE_SUPABASE_URL);
-      console.log('Supabase Anon Key configured:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      console.log('Syncing tasks from Supabase with detailed logging...');
       
-      // Check connection by directly testing the tasks table
-      // We'll skip any profile/auth checks entirely since they're causing issues
-      try {
-        console.log('▶️ Testing Supabase connection by checking tasks table directly...');
-        // We skip auth/profiles entirely and go straight to what matters - the tasks table
-      } catch (pingErr) {
-        console.error('❌ Supabase connection test exception:', pingErr);
-      }
+      // First check if we can connect to Supabase
+      const connection = await this.checkConnection();
+      console.log('Supabase connection status:', connection);
       
-      // Check if the tasks table exists by trying to access it
-      const { error: tableCheckError } = await supabase
-        .from('tasks')
-        .select('count')
-        .limit(1);
-      
-      if (tableCheckError) {
-        console.error('❌ Tasks table access error:', tableCheckError);  
-        
-        if (tableCheckError.code === '42P01') { // Table doesn't exist error
-          console.log('⚠️ Tasks table does not exist. We need to create it.');
-          
-          // In this case we should create mock tasks and store them in emergency cache
-          // as a fallback until the actual table is created in Supabase
-          const mockTasks = this.generateMockTasks();
-          localStorage.setItem('emergency_tasks', JSON.stringify(mockTasks));
-          console.log('✅ Created mock tasks and saved to emergency_tasks:', mockTasks.length);
+      if (!connection.connected) {
+        console.error('Cannot load tasks - No connection to Supabase');
+        // Generate dummy tasks for testing
+        const dummyTasks = this.createDummyTasks();
+        if (this.dispatcher) {
+          console.log('Dispatching dummy tasks for testing:', dummyTasks);
+          this.dispatcher({ type: 'TASKS_REFRESHED', payload: { tasks: dummyTasks } });
           return true;
         }
-      } else {
-        console.log('✅ Tasks table exists in Supabase');
-      }
-      
-      // Basic fetch of active tasks
-      const { data: supabaseTasks, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('status', 'Active');
-
-      if (error) {
-        console.error('❌ Error fetching tasks from Supabase:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
         return false;
       }
-
-      // Print tasks for debugging
-      console.log(`✅ Found ${supabaseTasks?.length || 0} tasks in Supabase`);
-      if (supabaseTasks?.length > 0) {
-        console.log('Sample task:', JSON.stringify(supabaseTasks[0], null, 2));
-      } else {
-        console.warn('⚠️ No tasks found in Supabase tasks table');
-        
-        // If the table exists but no tasks, let's add default tasks
-        console.log('⚠️ Creating default tasks in Supabase...');
-        const mockTasks = this.generateMockTasks();
-        
-        try {
-          // Insert default tasks into Supabase
-          const { data: insertedTasks, error: insertError } = await supabase
-            .from('tasks')
-            .insert(mockTasks)
-            .select();
-            
-          if (insertError) {
-            console.error('❌ Failed to insert default tasks:', insertError);
-          } else {
-            console.log('✅ Successfully inserted default tasks:', insertedTasks?.length);
-            
-            // Store in emergency cache
-            localStorage.setItem('emergency_tasks', JSON.stringify(insertedTasks || mockTasks));
-            console.log('✅ Saved inserted tasks to emergency_tasks');  
-            return true;
-          }
-        } catch (insertErr) {
-          console.error('❌ Exception during task insertion:', insertErr);
+      
+      // Check if the tasks table exists
+      const tableInfo = await this.findTasksTable();
+      console.log('Tasks table info:', tableInfo);
+      
+      let tableName = 'tasks'; // default
+      if (tableInfo.exists && tableInfo.table) {
+        tableName = tableInfo.table;
+      } else if (!tableInfo.exists) {
+        console.warn(`No tasks table found. Available tables: ${JSON.stringify(tableInfo.availableTables || [])}`);
+        // Generate dummy tasks for testing
+        const dummyTasks = this.createDummyTasks();
+        if (this.dispatcher) {
+          console.log('Dispatching dummy tasks since no table exists:', dummyTasks);
+          this.dispatcher({ type: 'TASKS_REFRESHED', payload: { tasks: dummyTasks } });
+          return true;
         }
-        
-        // Fallback - use mock tasks in emergency cache
-        localStorage.setItem('emergency_tasks', JSON.stringify(mockTasks));
-        console.log('✅ Saved mock tasks to emergency_tasks as fallback');
-        return true;
+        return false;
       }
       
-      // Store a simplified copy in localStorage for emergency access
-      if (supabaseTasks && supabaseTasks.length > 0) {
-        // Mark these tasks explicitly as real data from Supabase
-        const taggedTasks = supabaseTasks.map(task => ({
-          ...task,
-          is_real_data: true  // Special flag to identify real data
+      // Try different queries to maximize chances of finding tasks
+      console.log(`Trying to fetch tasks from '${tableName}' table...`);
+      
+      // First try without any filters
+      const { data: allTasks, error: allError } = await supabase
+        .from(tableName)
+        .select('*');
+      
+      if (allError) {
+        console.error(`Error fetching all tasks from ${tableName}:`, allError);
+        return false;
+      }
+      
+      console.log(`Found ${allTasks?.length || 0} total tasks in ${tableName} table:`, allTasks);
+      
+      // Filter active tasks client-side to handle different schemas
+      const activeTasks = allTasks?.filter(task => 
+        !task.status || task.status === 'Active' || task.status === 'active'
+      ) || [];
+      
+      console.log(`After filtering, found ${activeTasks.length} active tasks:`, activeTasks);
+      
+      // Store a copy in localStorage for emergency access
+      if (activeTasks.length > 0) {
+        localStorage.setItem('emergency_tasks', JSON.stringify(activeTasks));
+        
+        // Format tasks for the application, handling different possible schemas
+        const formattedTasks = activeTasks.map(task => ({
+          id: task.id?.toString() || Math.random().toString(36).substring(2, 9),
+          title: task.title || task.name || 'Mystery Task',
+          description: task.description || task.desc || 'Complete this task to earn rewards',
+          type: task.type || task.task_type || 'DAILY_LOGIN', 
+          targetGame: task.target_game || task.targetGame || null,
+          requirement: parseInt(task.requirement || task.req || 1, 10),
+          progress: parseInt(task.progress || 0, 10),
+          completed: task.completed === true,
+          claimed: task.claimed === true,
+          adBoostAvailable: task.ad_boost_available !== false,
+          expiresAt: task.expires_at || task.expiresAt || new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+          rewards: [
+            {
+              type: 'MYSTIC_COINS',
+              amount: parseFloat(task.reward || task.rewards || 10)
+            }
+          ]
         }));
-        localStorage.setItem('emergency_tasks', JSON.stringify(taggedTasks));
-        localStorage.setItem('last_real_data_sync', new Date().toISOString());
-        console.log('✅ REAL Supabase tasks saved to emergency_tasks in localStorage:', taggedTasks.length);
+        
+        console.log('Formatted tasks for application:', formattedTasks);
+        
+        // Save to local storage with timestamp
+        this.storageManager.saveData('gg_tasks', {
+          tasks: formattedTasks,
+          lastRefreshDate: new Date().toISOString(),
+          lastSyncDate: new Date().toISOString()
+        });
+        
+        // Update application state if dispatcher is available
+        if (this.dispatcher) {
+          console.log('Dispatching tasks to application state:', formattedTasks);
+          this.dispatcher({ type: 'TASKS_REFRESHED', payload: { tasks: formattedTasks } });
+        } else {
+          console.error('No dispatcher available to update app state!');
+        }
+        
         return true;
       } else {
-        // Only use mock tasks if we've never had real data before
-        const lastRealSync = localStorage.getItem('last_real_data_sync');
-        if (!lastRealSync) {
-          console.warn('⚠️ No tasks in Supabase. Using mock tasks as initial data only.');
-          const mockTasks = this.generateMockTasks().map(task => ({
-            ...task,
-            is_real_data: false // Mark as mock data
-          }));
-          localStorage.setItem('emergency_tasks', JSON.stringify(mockTasks));
-          return true;
-        } else {
-          console.warn('⚠️ Empty result from Supabase, but we had real data before. Not overwriting with mocks.');
-          // Keep existing emergency_tasks intact - don't replace with mocks!
-          return false;
+        console.warn('No active tasks found. Creating dummy tasks instead.');
+        // Generate dummy tasks if none were found
+        const dummyTasks = this.createDummyTasks();
+        if (this.dispatcher) {
+          this.dispatcher({ type: 'TASKS_REFRESHED', payload: { tasks: dummyTasks } });
         }
+        return true;
       }
-
     } catch (error) {
-      console.error('❌ Exception in syncFromSupabase:', error);
-      console.error('Stack trace:', error?.stack || 'No stack trace available');
+      console.error('Critical error in syncFromSupabase:', error);
       return false;
     }
+  }
+  
+  // Create dummy tasks for testing
+  createDummyTasks() {
+    console.log('Creating dummy tasks for testing...');
+    return [
+      {
+        id: 'dummy1',
+        title: 'Daily Login',
+        description: 'Log in to the app to earn rewards',
+        type: 'DAILY_LOGIN', 
+        targetGame: null,
+        requirement: 1,
+        progress: 0,
+        completed: false,
+        claimed: false,
+        adBoostAvailable: true,
+        expiresAt: new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+        rewards: [
+          {
+            type: 'MYSTIC_COINS',
+            amount: 10
+          }
+        ]
+      },
+      {
+        id: 'dummy2',
+        title: 'Sample Task',
+        description: 'This is a sample task to show the UI functions correctly',
+        type: 'DAILY_LOGIN', 
+        targetGame: null,
+        requirement: 1,
+        progress: 0,
+        completed: false,
+        claimed: false,
+        adBoostAvailable: true,
+        expiresAt: new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+        rewards: [
+          {
+            type: 'MYSTIC_COINS',
+            amount: 15
+          }
+        ]
+      }
+    ];
   }
 }

@@ -84,6 +84,13 @@ const HomeLayout = ({ children }) => {
               </div>
               <span className="text-white/70 text-xs">Profile</span>
             </Link>
+            
+            <Link to="/leaderboard" className="text-center">
+              <div className="w-10 h-10 rounded-full hover:bg-royalGold/20 flex items-center justify-center mx-auto mb-1 transition-colors">
+                <Icon name="trophy" color="#FFFFFF" size={20} />
+              </div>
+              <span className="text-white/70 text-xs">Leaderboard</span>
+            </Link>
           </motion.div>
         </div>
       </footer>

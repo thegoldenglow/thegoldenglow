@@ -2,7 +2,6 @@ import { StorageManager } from './StorageManager';
 import { AdManager } from './AdManager';
 import { SyncTasksService } from './SyncTasksService';
 import { generateTasks, checkAndUpdateStreak, getDefaultUserStats } from '../../utils/taskUtils';
-import { v4 as uuidv4 } from 'uuid';
 
 export class TasksManager {
   constructor(dispatch) {
@@ -10,6 +9,8 @@ export class TasksManager {
     this.storageManager = new StorageManager();
     this.adManager = new AdManager();
     this.syncService = new SyncTasksService();
+    // Connect the dispatcher to the sync service
+    this.syncService.setDispatcher(dispatch);
     this.taskList = [];
     this.streakData = {
       current: 0,
@@ -29,162 +30,72 @@ export class TasksManager {
 
   async loadTasks() {
     try {
-      // Log environment for debugging
-      console.log('Environment:', import.meta.env.MODE);
-      console.log('TasksManager.loadTasks() called at:', new Date().toISOString());
+      console.log('Loading tasks...');
       
-      // Check for the last successful real data sync
-      const lastRealSync = localStorage.getItem('last_real_data_sync');
-      const hasHadRealData = !!lastRealSync;
-      if (hasHadRealData) {
-        console.log('✅ Previously synced real data from Supabase on:', new Date(lastRealSync).toLocaleString());
+      // First attempt to sync with Supabase immediately
+      try {
+        console.log('Attempting to load tasks directly from Supabase...');
+        const syncResult = await this.syncService.syncFromSupabase();
+        
+        // Check if tasks were loaded from gg_tasks storage after sync
+        const localTaskData = this.storageManager.loadData('gg_tasks');
+        if (localTaskData && localTaskData.tasks && localTaskData.tasks.length > 0) {
+          console.log('Using tasks from Supabase sync:', localTaskData.tasks.length);
+          this.taskList = localTaskData.tasks;
+          this.dispatch({ type: 'TASKS_LOADED', payload: localTaskData.tasks });
+          return;
+        }
+      } catch (syncError) {
+        console.warn('Failed to sync from Supabase:', syncError);
       }
-
-      // Try to load from emergency cache first (from our simplified SyncTasksService)
+      
+      // If Supabase sync fails, try loading from emergency cache
       const emergencyTasks = localStorage.getItem('emergency_tasks');
       
       if (emergencyTasks) {
         try {
           const parsedTasks = JSON.parse(emergencyTasks);
-          const isRealData = parsedTasks.length > 0 && parsedTasks[0].is_real_data === true;
+          console.log('Using emergency tasks from cache:', parsedTasks.length);
           
-          console.log(`▶️ Using ${isRealData ? 'REAL' : 'MOCK'} tasks from cache:`, parsedTasks.length);
+          // Convert to the expected format
+          const formattedTasks = parsedTasks.map(task => ({
+            id: task.id.toString(),
+            title: task.title || 'Task',
+            description: task.description || 'Complete this task to earn rewards',
+            type: task.type || 'DAILY_LOGIN', 
+            targetGame: task.target_game || null,
+            requirement: parseInt(task.requirement || 1, 10),
+            progress: parseInt(task.progress || 0, 10),
+            completed: task.completed === true,
+            claimed: task.claimed === true,
+            adBoostAvailable: task.ad_boost_available !== false,
+            expiresAt: task.expires_at || new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+            rewards: [
+              {
+                type: 'MYSTIC_COINS',
+                amount: parseFloat(task.reward) || 10
+              }
+            ]
+          }));
           
-          if (parsedTasks.length === 0) {
-            console.warn('⚠️ Emergency tasks cache exists but is empty - will try direct sync');
-            // Don't throw error yet, try direct sync first
-          } else {
-            // Convert to the expected format
-            const formattedTasks = parsedTasks.map(task => ({
-              id: task.id?.toString() || uuidv4(),
-              title: task.title || 'Unknown Task',
-              description: task.description || 'Task details unavailable',
-              type: task.type || 'Daily', 
-              targetGame: task.target_game || null,
-              requirement: Number(task.requirement) || 1,
-              progress: Number(task.progress) || 0,
-              completed: Boolean(task.completed) || false,
-              claimed: Boolean(task.claimed) || false,
-              adBoostAvailable: task.ad_boost_available !== false, // Default to true
-              expiresAt: task.expires_at || new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
-              rewards: [
-                {
-                  type: task.reward_type || 'MYSTIC_COINS',
-                  amount: Number(task.reward_amount || task.reward) || 10
-                }
-              ],
-              isRealData: isRealData // Keep track of data source
-            }));
-            
-            console.log('▶️ Sample formatted task:', JSON.stringify(formattedTasks[0], null, 2));
-            
-            this.taskList = formattedTasks;
-            this.dispatch({ type: 'TASKS_LOADED', payload: formattedTasks });
-            
-            // Also try to sync in the background
-            console.log('▶️ Attempting background sync with Supabase...');
-            this.syncService.syncFromSupabase()
-              .then(success => {
-                console.log(success ? '✅ Background sync successful!' : '⚠️ Background sync returned false');
-                // If we had mock data but got real data, reload tasks without refreshing the page
-                if (success && !isRealData) {
-                  console.log('✅ Got real data to replace mocks! Reloading tasks...');
-                  setTimeout(() => this.loadTasks(), 1000); // Give a second for storage to update
-                }
-              })
-              .catch(e => console.warn('⚠️ Background sync failed:', e));
-            
-            // If we have real data, we're done
-            // Only keep trying if we have mock data
-            if (isRealData) {
-              return; // We're done if we have real data
-            }
-          }
+          this.taskList = formattedTasks;
+          this.dispatch({ type: 'TASKS_LOADED', payload: formattedTasks });
+          return;
         } catch (parseError) {
-          console.error('❌ Error parsing emergency tasks:', parseError);
-          // Continue to fallback
-        }
-      } else {
-        console.log('⚠️ No emergency tasks found in localStorage');
-      }
-      
-      // Before falling back to mocks, try a direct Supabase sync
-      try {
-        console.log('▶️ Attempting direct Supabase sync before generating mock tasks...');
-        const syncSuccess = await this.syncService.syncFromSupabase();
-        
-        if (syncSuccess) {
-          console.log('✅ Direct Supabase sync successful!');
-          // Now try to load from emergency cache again (should be populated by the sync)
-          const freshEmergencyTasks = localStorage.getItem('emergency_tasks');
-          
-          if (freshEmergencyTasks) {
-            const parsedFreshTasks = JSON.parse(freshEmergencyTasks);
-            if (parsedFreshTasks && parsedFreshTasks.length > 0) {
-              const isRealData = parsedFreshTasks[0].is_real_data === true;
-              console.log(`✅ Successfully loaded ${isRealData ? 'REAL' : 'MOCK'} tasks from Supabase!`, parsedFreshTasks.length);
-              
-              // Instead of forcing a reload, just format and use the tasks directly
-              const formattedTasks = parsedFreshTasks.map(task => ({
-                id: task.id?.toString() || uuidv4(),
-                title: task.title || 'Unknown Task',
-                description: task.description || 'Task details unavailable',
-                type: task.type || 'Daily', 
-                targetGame: task.target_game || null,
-                requirement: Number(task.requirement) || 1,
-                progress: Number(task.progress) || 0,
-                completed: Boolean(task.completed) || false,
-                claimed: Boolean(task.claimed) || false,
-                adBoostAvailable: task.ad_boost_available !== false,
-                expiresAt: task.expires_at || new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
-                rewards: [
-                  {
-                    type: task.reward_type || 'MYSTIC_COINS',
-                    amount: Number(task.reward_amount || task.reward) || 10
-                  }
-                ],
-                isRealData: isRealData
-              }));
-              
-              this.taskList = formattedTasks;
-              this.dispatch({ type: 'TASKS_LOADED', payload: formattedTasks });
-              return;
-            }
-          }
-        } else {
-          const hasHadRealData = !!localStorage.getItem('last_real_data_sync');
-          if (hasHadRealData) {
-            // If we've had real data before, don't fall back to mocks!
-            console.warn('⚠️ Direct Supabase sync failed, but we had real data before. NOT using mock tasks.');
-            // Don't continue to fallback in this case
-            return;
-          } else {
-            console.warn('⚠️ Direct Supabase sync failed, will use mock tasks as initial data only');
-          }
-        }
-      } catch (syncError) {
-        console.error('❌ Error during direct Supabase sync:', syncError);
-        // Continue to fallback only if we've never had real data
-        if (!!localStorage.getItem('last_real_data_sync')) {
-          return; // Don't use mocks if we've had real data before
+          console.error('Error parsing emergency tasks:', parseError);
         }
       }
       
       // Fallback to generating tasks if we don't have any cached tasks
-      console.log('▶️ Generating mock tasks as last resort...');
+      console.log('No tasks found from any source, generating local tasks...');
       const tasks = generateTasks();
       this.taskList = tasks;
       this.dispatch({ type: 'TASKS_LOADED', payload: tasks });
       
-      // Schedule another sync attempt for the future
-      setTimeout(() => {
-        console.log('▶️ Attempting delayed background sync...');
-        this.syncService.syncFromSupabase()
-          .then(success => console.log(success ? '✅ Delayed sync successful' : '⚠️ Delayed sync returned false'))
-          .catch(e => console.warn('⚠️ Delayed sync failed:', e));
-      }, 5000); // Try again after 5 seconds
+      // Try syncing again in the background for next reload
+      this.syncService.syncFromSupabase().catch(e => console.warn('Background sync retry failed:', e));
     } catch (error) {
-      console.error('❌ Unhandled error in loadTasks:', error);
+      console.error('Error loading tasks:', error);
       this.dispatch({ type: 'SET_ERROR', payload: 'Failed to load tasks' });
     }
   }

@@ -3,6 +3,14 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+// Log the Supabase configuration for debugging
+console.log('Supabase Configuration:', { 
+  urlConfigured: !!supabaseUrl, 
+  keyConfigured: !!supabaseAnonKey,
+  urlStart: supabaseUrl ? supabaseUrl.substring(0, 10) + '...' : 'undefined',
+  keyStart: supabaseAnonKey ? supabaseAnonKey.substring(0, 5) + '...' : 'undefined'
+});
+
 // Create Supabase client with enhanced configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

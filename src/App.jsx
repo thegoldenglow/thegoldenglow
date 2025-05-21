@@ -7,6 +7,7 @@ import { TasksProvider } from './contexts/TasksContext';
 import { RewardProvider } from './contexts/RewardContext';
 import { WalletProvider } from './contexts/WalletContext';
 import { GameRewardProvider } from './contexts/GameRewardContext';
+import TelegramAuthManager from './components/auth/TelegramAuthManager';
 import HomePage from './components/pages/HomePage';
 import ProfilePage from './components/pages/ProfilePage';
 import DailyTasksPage from './components/pages/DailyTasksPage';
@@ -159,6 +160,9 @@ function App() {
                     <div 
                       className="min-h-screen bg-deepLapis bg-pattern-stars text-textLight relative"
                     >
+                      {/* Telegram Auth Manager - automatically authenticates users from Telegram */}
+                      <TelegramAuthManager />
+                      
                       {/* Decorative top border */}
                       <div className="h-1 w-full bg-gradient-gold absolute top-0 left-0 shadow-glow z-10"></div>
                       <div 

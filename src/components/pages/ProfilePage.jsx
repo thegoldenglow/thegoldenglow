@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useUser } from '../../contexts/UserContext';
@@ -6,10 +6,28 @@ import { useGame } from '../../contexts/GameContext';
 import HomeLayout from '../templates/HomeLayout';
 import Button from '../atoms/Button';
 import Icon from '../atoms/Icon';
+import { isValidUsername } from '../../utils/usernameGenerator';
 
 const ProfilePage = () => {
-  const { user, logout } = useUser();
+  const { user, logout, updateUsername } = useUser();
   const { games } = useGame();
+  
+  // State for username editing
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Reset form when user changes or editing is toggled off
+  useEffect(() => {
+    if (user && user.username) {
+      setNewUsername(user.username);
+    }
+    
+    if (!isEditingUsername) {
+      setUsernameError('');
+    }
+  }, [user, isEditingUsername]);
   
   if (!user) {
     return (
@@ -97,9 +115,143 @@ const ProfilePage = () => {
           {/* User info */}
           <div className="text-center sm:text-left flex-1">
             <h1 className="text-2xl font-primary text-royalGold mb-1">{user.name}</h1>
-            {/* Show username with priority: telegram_username > username */}
-            {(user.telegram_username || user.username) && (
-              <p className="text-white/70 mb-2">@{user.telegram_username || user.username}</p>
+            
+            {/* Username display/edit section */}
+            {!isEditingUsername ? (
+              <div className="flex items-center mb-2 justify-center sm:justify-start">
+                <p className="text-white/70">@{user.username}</p>
+                <button 
+                  onClick={() => setIsEditingUsername(true)}
+                  className="ml-2 text-xs text-royalGold hover:text-royalGold/80 bg-deepLapisLight/30 rounded-full p-1"
+                  aria-label="Edit username"
+                >
+                  <Icon name="edit" size={12} color="#DAA520" />
+                </button>
+              </div>
+            ) : (
+              <div className="mb-3">
+                <div className="flex items-center mb-1 justify-center sm:justify-start">
+                  <div className="bg-deepLapisLight/50 flex rounded-lg overflow-hidden border border-royalGold/30">
+                    <span className="px-2 py-1 text-royalGold/70 bg-deepLapisLight/70">@</span>
+                    <input
+                      type="text"
+                      value={newUsername}
+                      onChange={(e) => {
+                        setNewUsername(e.target.value);
+                        // Validate as user types
+                        if (!isValidUsername(e.target.value)) {
+                          setUsernameError('Username must be 3-20 characters with only letters, numbers, and underscores');
+                        } else {
+                          setUsernameError('');
+                        }
+                      }}
+                      className="px-2 py-1 bg-deepLapisLight/30 text-white/90 focus:outline-none"
+                      placeholder="username"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="flex ml-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          console.log('Saving username change:', newUsername);
+                          setIsSubmitting(true);
+                          
+                          // Validate before submission
+                          if (!isValidUsername(newUsername)) {
+                            console.error('Username validation failed');
+                            setUsernameError('Username must be 3-20 characters with only letters, numbers, and underscores');
+                            setIsSubmitting(false);
+                            return;
+                          }
+                          
+                          // Save to database with verbose logging
+                          console.log('Calling updateUsername function with:', newUsername);
+                          const result = await updateUsername(newUsername);
+                          console.log('Update username result:', result);
+                          
+                          // Force a direct database insert as a backup approach
+                          try {
+                            // Import supabase directly to ensure we have access
+                            const { supabase } = await import('../../utils/supabase');
+                            console.log('Attempting direct database insert/update for:', newUsername);
+                            
+                            // Try to find existing profile by username
+                            const { data: existingProfile } = await supabase
+                              .from('profiles')
+                              .select('id')
+                              .eq('username', user.username)
+                              .single();
+                              
+                            if (existingProfile) {
+                              // Update existing profile
+                              console.log('Direct update for profile ID:', existingProfile.id);
+                              await supabase
+                                .from('profiles')
+                                .update({ username: newUsername })
+                                .eq('id', existingProfile.id);
+                            } else {
+                              // Create new profile as fallback
+                              console.log('Direct insert of new profile for:', newUsername);
+                              await supabase
+                                .from('profiles')
+                                .insert({
+                                  username: newUsername,
+                                  points: user.points || 0,
+                                  created_at: new Date().toISOString()
+                                });
+                            }
+                          } catch (directDbError) {
+                            console.error('Direct database operation failed:', directDbError);
+                          }
+                          
+                          if (result.success) {
+                            console.log('Username updated successfully');
+                            setIsEditingUsername(false);
+                          } else {
+                            console.error('Username update failed:', result.error);
+                            setUsernameError(result.error);
+                          }
+                        } catch (error) {
+                          console.error('Unexpected error during username update:', error);
+                          setUsernameError('An unexpected error occurred');
+                        } finally {
+                          setIsSubmitting(false);
+                        }
+                      }}
+                      disabled={isSubmitting || !newUsername || !!usernameError}
+                      className="text-xs text-deepLapis bg-royalGold hover:bg-royalGold/80 rounded-full p-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Save username"
+                    >
+                      <Icon name="check" size={12} color="#091F39" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingUsername(false);
+                        setNewUsername(user.username);
+                        setUsernameError('');
+                      }}
+                      className="text-xs text-white/70 hover:text-white bg-deepLapisLight/50 hover:bg-deepLapisLight/70 rounded-full p-1 ml-1"
+                      aria-label="Cancel editing"
+                      disabled={isSubmitting}
+                    >
+                      <Icon name="x" size={12} color="#FFFFFF" />
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Error message */}
+                {usernameError && (
+                  <div className="bg-red-500/20 border border-red-400/50 rounded-md px-3 py-2 mb-2">
+                    <p className="text-xs text-red-400 text-center sm:text-left flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span>{usernameError}</span>
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
             
             {/* Show user source */}

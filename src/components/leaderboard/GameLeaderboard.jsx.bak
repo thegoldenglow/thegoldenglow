@@ -1,0 +1,180 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import Icon from '../atoms/Icon';
+import { supabase } from '../../utils/supabase';
+import { getGameLeaderboard } from '../../utils/gameScoreManager';
+
+const GameLeaderboard = ({
+  leaderboardData,
+  onDataLoad,
+  currentUserRank,
+  title,
+  subtitle,
+  maxItems,
+  isLoading: externalLoading,
+  gameId, // Game ID to identify which leaderboard to display
+}) => {
+  // Local state to ensure we always have data to display
+  const [data, setData] = useState(leaderboardData || []);
+  const [isLoading, setIsLoading] = useState(externalLoading);
+  const [usedFallback, setUsedFallback] = useState(false);
+
+  // Update local state when props change
+  useEffect(() => {
+    if (leaderboardData && leaderboardData.length > 0) {
+      setData(leaderboardData);
+    }
+  }, [leaderboardData]);
+
+  // Update loading state when external loading prop changes
+  useEffect(() => {
+    setIsLoading(externalLoading);
+  }, [externalLoading]);
+
+  // If no data is passed in, fetch it directly using our gameScoreManager
+  useEffect(() => {
+    if ((!leaderboardData || leaderboardData.length === 0) && !usedFallback) {
+      fetchLeaderboardData();
+    }
+  }, [leaderboardData, gameId, usedFallback]);
+
+  const fetchLeaderboardData = async () => {
+    try {
+      setIsLoading(true);
+      console.log(`GameLeaderboard: Fetching leaderboard data for game ID: ${gameId || 'all'}`);
+      
+      // Use the gameScoreManager to get game-specific leaderboard data
+      const data = await getGameLeaderboard(gameId || 'all', 20);
+      
+      // Update the data and notify parent component
+      setData(data);
+      if (typeof onDataLoad === 'function') {
+        onDataLoad(data);
+      }
+    } catch (error) {
+      console.error('Error fetching game leaderboard data:', error);
+    } finally {
+      setIsLoading(false);
+      setUsedFallback(true);
+    }
+  };
+  
+  // If there's no data after all attempts, show a message
+  if ((!data || data.length === 0) && !isLoading) {
+    return (
+      <div className="bg-deepLapis/40 backdrop-blur-md border border-royalGold/30 rounded-lg p-4 shadow-glow">
+        <h3 className="text-textGold text-xl font-semibold text-center mb-2">No Rankings Yet</h3>
+        <p className="text-royalGoldLight/80 text-center">Be the first to claim your spot!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-deepLapis/40 backdrop-blur-md border border-royalGold/30 rounded-lg p-4 shadow-glow">
+      {/* Leaderboard header */}
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h3 className="text-textGold text-xl font-semibold">
+            {title || (gameId === 'all' ? 'Overall' : gameId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '))} Rankings
+          </h3>
+          <p className="text-royalGoldLight/80 text-sm">{subtitle || 'Masters of Enlightenment'}</p>
+        </div>
+        {isLoading && (
+          <div className="animate-spin text-royalGold">
+            <Icon name="spinner" size={24} />
+          </div>
+        )}
+      </div>
+
+      {/* Leaderboard table */}
+      <div className="overflow-hidden">
+        {/* Headers */}
+        <div className="grid grid-cols-12 gap-2 px-3 py-2 text-royalGoldLight/70 text-sm font-medium border-b border-royalGold/20">
+          <div className="col-span-2 text-center">#</div>
+          <div className="col-span-6">Player</div>
+          <div className="col-span-4 text-right">Points</div>
+        </div>
+
+        {/* Entries */}
+        <AnimatePresence>
+          {data.slice(0, maxItems || 10).map((entry, index) => {
+            const isCurrentUser = currentUserRank && entry.rank === currentUserRank;
+            const rankClass = index === 0 ? 'text-gold' : index === 1 ? 'text-silver' : index === 2 ? 'text-bronze' : 'text-royalGoldLight/70';
+            
+            return (
+              <motion.div
+                key={`leaderboard-entry-${entry.id || index}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+                className={`grid grid-cols-12 gap-2 px-3 py-2 ${isCurrentUser ? 'bg-deepLapis/70 border-l-4 border-royalGold' : 'border-b border-royalGold/10'} ${index % 2 === 0 ? '' : 'bg-deepLapis/20'}`}
+              >
+                <div className={`col-span-2 text-center font-semibold ${rankClass}`}>
+                  {entry.rank || index + 1}
+                </div>
+                <div className="col-span-6 truncate">
+                  <span className={`${isCurrentUser ? 'text-royalGold font-medium' : 'text-royalGoldLight'}`}>
+                    />
+                  ) : (
+                    <Icon name="profile" size={16} className="text-royalGoldLight/70" />
+                  )}
+                </div>
+                <div>
+                  <p className={`font-medium ${entry.id === userId ? 'text-textGold' : 'text-royalGoldLight'}`}>
+                    {entry.username}
+                  </p>
+                  {entry.id === userId && (
+                    <span className="text-xs text-royalGold">You</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Score - visible on all screens */}
+              <div className="col-span-4 sm:col-span-3 text-right font-mono">
+                <span className={`${entry.id === userId ? 'text-textGold' : 'text-royalGoldLight'} font-bold`}>
+                  {entry.points.toLocaleString()}
+                </span>
+                <span className="text-xs text-royalGoldLight/60 ml-1">pts</span>
+              </div>
+
+              {/* Additional stats - visible only on larger screens */}
+              <div className="hidden sm:block sm:col-span-3 text-right">
+                <div className="inline-block px-3 py-1 rounded-full bg-deepLapis border border-royalGold/20 text-sm">
+                  <span className="text-royalGoldLight/90">{gameType === 'all' ? 'Total: ' : 'Score: '}</span>
+                  <span className="text-textGold font-medium">{entry.points.toLocaleString()}</span>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  );
+};
+
+// Default props
+GameLeaderboard.defaultProps = {
+  leaderboardData: [],
+  onDataLoad: () => {},
+  currentUserRank: null,
+  title: 'Top Players',
+  subtitle: 'Masters of Enlightenment',
+  maxItems: 10,
+  isLoading: false,
+  gameId: 'all', // Default to overall leaderboard if no game ID is provided
+};
+
+// Default props
+GameLeaderboard.defaultProps = {
+  leaderboardData: [],
+  onDataLoad: () => {},
+  currentUserRank: null,
+  title: 'Top Players',
+  subtitle: 'Masters of Enlightenment',
+  maxItems: 10,
+  isLoading: false,
+  gameId: 'all', // Default to overall leaderboard if no game ID is provided
+};
+
+export default GameLeaderboard;

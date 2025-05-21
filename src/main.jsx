@@ -3,9 +3,19 @@ import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 import { setupTelegramWebApp } from './utils/telegramWebAppLocal'
+import { runMigrations } from './utils/initMigrations'
 
 try {
   console.log('Starting React application initialization...');
+  
+  // Run database migrations before starting the app
+  runMigrations()
+    .then(result => {
+      console.log('Database migrations completed:', result.success ? 'success' : 'failed');
+    })
+    .catch(error => {
+      console.error('Error running migrations:', error);
+    });
   
   // Initialize Telegram WebApp with our local implementation before rendering React
   const webApp = setupTelegramWebApp();

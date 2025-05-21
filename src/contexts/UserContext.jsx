@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
+import { validateTelegramWebAppData, getTelegramUser, initializeTelegramBot } from '../utils/telegramBot';
+import { generateRandomUsername, isValidUsername, isUsernameAvailable } from '../utils/usernameGenerator';
 
 const UserContext = createContext();
 
@@ -40,7 +42,7 @@ export const UserProvider = ({ children }) => {
                 id: supabaseSession.user.id,
                 name: supabaseSession.user.user_metadata?.full_name || 'User',
                 lastName: '',
-                username: supabaseSession.user.email?.split('@')[0] || null,
+                username: supabaseSession.user.email?.split('@')[0] || generateRandomUsername(),
                 avatar: null,
                 points: 0,
                 createdAt: new Date().toISOString(),
@@ -106,13 +108,34 @@ export const UserProvider = ({ children }) => {
           // Check if we're in Telegram environment
           if (window.Telegram && window.Telegram.WebApp) {
             console.log('Detected Telegram WebApp, retrieving user data...');
+            
+            // Initialize Telegram bot
+            initializeTelegramBot()
+              .then(success => {
+                console.log('Telegram bot initialization:', success ? 'successful' : 'failed');
+              })
+              .catch(error => {
+                console.error('Telegram bot initialization error:', error);
+              });
+            
             // Get user data from Telegram WebApp
-            const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+            const tgUser = getTelegramUser();
             const initData = window.Telegram.WebApp.initData;
             
-            // Store auth token for API calls
+            // Validate and store auth token for API calls
             if (initData) {
-              setAuthToken(initData);
+              validateTelegramWebAppData(initData)
+                .then(isValid => {
+                  if (isValid) {
+                    console.log('Telegram WebApp data validated successfully');
+                    setAuthToken(initData);
+                  } else {
+                    console.warn('Telegram WebApp data validation failed');
+                  }
+                })
+                .catch(error => {
+                  console.error('Telegram validation error:', error);
+                });
             }
             
             if (tgUser) {
@@ -245,6 +268,8 @@ export const UserProvider = ({ children }) => {
                   telegram_username: tgUser.username || null,
                   telegram_photo_url: photoUrl,
                   user_source: 'telegram_user',
+                  bot_authenticated: true,
+                  bot_auth_date: new Date().toISOString(),
                   name: tgUser.first_name || 'User',
                   lastName: tgUser.last_name || '',
                   username: tgUser.username || null,
@@ -498,7 +523,7 @@ export const UserProvider = ({ children }) => {
         id: 'demo_' + Date.now().toString(),
         name: 'Demo User',
         lastName: '',
-        username: 'demo_user',
+        username: generateRandomUsername(),
         avatar: null,
         points: 0,
         createdAt: new Date().toISOString(),
@@ -624,6 +649,133 @@ export const UserProvider = ({ children }) => {
     return updatedUser.points;
   };
 
+  // Update username
+  const updateUsername = async (newUsername) => {
+    try {
+      // Validate username format
+      if (!isValidUsername(newUsername)) {
+        return { success: false, error: 'Username must be 3-20 characters and contain only letters, numbers, and underscores' };
+      }
+      
+      // Check if the username is available
+      const availabilityCheck = await isUsernameAvailable(supabase, newUsername, user?.id);
+      if (!availabilityCheck.available) {
+        return { success: false, error: availabilityCheck.error || 'Username is already taken' };
+      }
+      
+      // Update username in local state and localStorage first
+      const updatedUser = { ...user, username: newUsername };
+      setUser(updatedUser);
+      localStorage.setItem('gg_user', JSON.stringify(updatedUser));
+      
+      // Always try to update in Supabase regardless of session status
+      // This matches the dual storage approach used in Golden Glow
+      try {
+        console.log('Updating username in Supabase for user:', JSON.stringify(user));
+        
+        // Check if we have a session with Supabase auth
+        if (session && session.user) {
+          // First try to find profile by user_id (which links to auth.users)
+          const { data: profileByUserId } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .single();
+            
+          if (profileByUserId) {
+            // Update existing profile
+            console.log('Updating existing profile by user_id match:', profileByUserId.id);
+            const { error } = await supabase
+              .from('profiles')
+              .update({ username: newUsername })
+              .eq('id', profileByUserId.id);
+              
+            if (error) {
+              console.error('Error updating username in Supabase:', error);
+            }
+          } else {
+            // Try to find profile by username
+            const { data: profileByUsername } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('username', user.username)
+              .single();
+              
+            if (profileByUsername) {
+              // Update existing profile
+              console.log('Updating existing profile by username match:', profileByUsername.id);
+              const { error } = await supabase
+                .from('profiles')
+                .update({ username: newUsername })
+                .eq('id', profileByUsername.id);
+                
+              if (error) {
+                console.error('Error updating username in Supabase:', error);
+              }
+            } else {
+              // Create new profile linked to auth user
+              console.log('Creating new profile for auth user');
+              const { error } = await supabase
+                .from('profiles')
+                .insert({
+                  user_id: session.user.id,
+                  username: newUsername,
+                  points: user.points || 0,
+                  created_at: new Date().toISOString()
+                });
+                
+              if (error) {
+                console.error('Error creating new profile in Supabase:', error);
+              }
+            }
+          }
+        } else {
+          // No auth session, try to find by username
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('username', user.username)
+            .single();
+            
+          if (existingProfile) {
+            // Update existing profile
+            console.log('Updating existing profile (no auth):', existingProfile.id);
+            const { error } = await supabase
+              .from('profiles')
+              .update({ username: newUsername })
+              .eq('id', existingProfile.id);
+              
+            if (error) {
+              console.error('Error updating username in Supabase:', error);
+            }
+          } else {
+            // Create new unlinked profile
+            console.log('Creating new unlinked profile');
+            const { error } = await supabase
+              .from('profiles')
+              .insert({
+                username: newUsername,
+                points: user.points || 0,
+                created_at: new Date().toISOString()
+              });
+              
+            if (error) {
+              console.error('Error inserting new profile in Supabase:', error);
+            }
+          }
+        }
+      } catch (dbError) {
+        console.error('Database error during username update:', dbError);
+        // We still consider the update successful if local storage is updated
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating username:', error);
+      return { success: false, error: error.message };
+    }
+  };
+  
   // Update user stats
   const updateUserStats = (stats) => {
     if (!user) return;
@@ -1014,7 +1166,8 @@ export const UserProvider = ({ children }) => {
       getUserLevel,
       referrals,
       authToken,
-      session
+      session,
+      updateUsername
     }}>
       {children}
     </UserContext.Provider>

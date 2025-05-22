@@ -36,7 +36,10 @@ const GameLayout = ({
   };
   
   return (
-    <div className="h-screen max-h-screen text-white overflow-hidden flex flex-col relative">
+    <div 
+      className="h-screen max-h-screen text-white overflow-hidden flex flex-col relative" 
+      style={{ touchAction: 'none' }} // Prevents browser handling of touch gestures
+    >
       {/* Background decorative pattern - REMOVED to show main app background */}
       {/* 
       <div 
@@ -69,7 +72,11 @@ const GameLayout = ({
       </header>
       
       {/* Game content */}
-      <main className="flex-grow py-3 px-3 overflow-hidden" data-component-name="GameLayout">
+      <main 
+        className="flex-grow py-2 px-2 overflow-hidden" 
+        data-component-name="GameLayout"
+        style={{ overscrollBehavior: 'none' }} // Prevents bounce/overscroll effects
+      >
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

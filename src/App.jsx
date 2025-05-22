@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+// Import no-scroll styles
+import './styles/noScroll.css';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { UserProvider } from './contexts/UserContext';
@@ -21,6 +23,7 @@ import PathOfEnlightenmentGame from './games/PathOfEnlightenment/PathOfEnlighten
 import FlameOfWisdomGame from './games/FlameOfWisdom/FlameOfWisdomGame';
 import SacredTappingGame from './games/SacredTapping/SacredTappingGame';
 import GatesOfKnowledgeGame from './games/GatesOfKnowledge/GatesOfKnowledgeGame';
+import NoScrollWrapper from './components/NoScrollWrapper';
 import MysticalTapJourneyGame from './games/MysticalTapJourney/MysticalTapJourneyGame';
 import TicTacToe from './games/TicTacToe/TicTacToe';
 
@@ -165,8 +168,9 @@ function App() {
                       
                       {/* Decorative top border */}
                       <div className="h-1 w-full bg-gradient-gold absolute top-0 left-0 shadow-glow z-10"></div>
-                      <div 
-                        className="min-h-full max-w-6xl mx-auto px-4 py-6 relative z-0" 
+                      <NoScrollWrapper>
+                        <div 
+                        className="min-h-full max-w-6xl mx-auto px-4 py-6 relative z-0"
                         data-component-name="App"
                         style={{
                           backgroundImage: "url('/assets/IMG_8525-ezgif.com-video-to-webp-converter.webp')",
@@ -195,7 +199,8 @@ function App() {
                           {/* Default redirect for unknown routes */}
                           <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
-                      </div>
+                        </div>
+                      </NoScrollWrapper>
                     </div>
                   </Router>
                 </TasksProvider>

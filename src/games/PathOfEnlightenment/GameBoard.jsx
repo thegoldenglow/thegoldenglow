@@ -18,6 +18,23 @@ const DIRECTIONS = {
 };
 
 const GameBoard = ({ gameOver, onGameOver, onScoreUpdate, onRestart }) => {
+  // Add responsive sizing based on viewport
+  const [boardSize, setBoardSize] = useState(0);
+  
+  // Calculate board size based on viewport dimensions
+  useEffect(() => {
+    const calculateSize = () => {
+      // Get the smaller dimension between width and height
+      const viewportWidth = Math.min(window.innerWidth - 32, 350); // Account for padding
+      const viewportHeight = window.innerHeight - 250; // Account for header and other UI elements
+      const availableSize = Math.min(viewportWidth, viewportHeight);
+      setBoardSize(availableSize);
+    };
+    
+    calculateSize();
+    window.addEventListener('resize', calculateSize);
+    return () => window.removeEventListener('resize', calculateSize);
+  }, []);
   // Game state
   const [tiles, setTiles] = useState([]);
   const [grid, setGrid] = useState(EMPTY_GRID);
@@ -392,6 +409,9 @@ const GameBoard = ({ gameOver, onGameOver, onScoreUpdate, onRestart }) => {
   const handleTouchStart = (e) => {
     if (gameOver) return;
     
+    // Prevent default to stop page scrolling
+    e.preventDefault();
+    
     const touch = e.touches[0];
     setTouchStart({
       x: touch.clientX,
@@ -401,6 +421,9 @@ const GameBoard = ({ gameOver, onGameOver, onScoreUpdate, onRestart }) => {
   
   const handleTouchEnd = (e) => {
     if (!touchStart || gameOver) return;
+    
+    // Prevent default to stop page scrolling
+    e.preventDefault();
     
     const touch = e.changedTouches[0];
     const dx = touch.clientX - touchStart.x;
@@ -468,9 +491,18 @@ const GameBoard = ({ gameOver, onGameOver, onScoreUpdate, onRestart }) => {
   };
   
   return (
-    <div className="flex flex-col items-center">
+    <div 
+      className="flex flex-col items-center" 
+      onTouchMove={(e) => e.preventDefault()} // Prevent scrolling during game interaction
+    >
       <div 
-        className="relative w-full max-w-xs aspect-square bg-deepLapis/50 p-2 rounded-lg border border-royalGold/30"
+        className="relative bg-deepLapis/50 p-2 rounded-lg border border-royalGold/30"
+        style={{
+          width: `${boardSize}px`,
+          height: `${boardSize}px`,
+          maxWidth: '100%',
+          margin: '0 auto'
+        }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -508,14 +540,14 @@ const GameBoard = ({ gameOver, onGameOver, onScoreUpdate, onRestart }) => {
       </div>
       
       {/* Game controls */}
-      <div className="mt-6 flex justify-center space-x-4">
+      <div className="mt-3 flex justify-center space-x-4">
         <p className="text-white/70 text-sm">
           Use <span className="text-royalGold">arrow keys</span> or <span className="text-royalGold">swipe</span> to move tiles
         </p>
       </div>
       
       {/* Instructions */}
-      <div className="mt-4 p-3 bg-deepLapisLight/30 rounded-lg w-full max-w-xs">
+      <div className="mt-2 p-2 bg-deepLapisLight/30 rounded-lg w-full" style={{ maxWidth: `${boardSize}px` }}>
         <p className="text-xs text-white/70 text-center">
           Join the sacred patterns to achieve enlightenment. Reach the 2048 tile to complete your journey.
         </p>

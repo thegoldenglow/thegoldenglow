@@ -10,7 +10,7 @@ const HomeLayout = ({ children }) => {
   const { user } = useUser();
   
   return (
-    <div className="min-h-screen text-white relative overflow-y-auto">
+    <div className="min-h-screen text-white relative overflow-y-auto pb-20"> {/* Added padding at bottom to prevent content from being hidden behind fixed footer */}
       {/* Background decorative elements - REMOVED */}
       {/*
       <div 
@@ -55,8 +55,8 @@ const HomeLayout = ({ children }) => {
         {children}
       </main>
       
-      {/* Navigation footer */}
-      <footer className="backdrop-filter backdrop-blur-md border-t border-royalGold/30 py-3 px-4" data-component-name="HomeLayout">
+      {/* Navigation footer - sticky at bottom */}
+      <footer className="fixed bottom-0 left-0 right-0 z-10 backdrop-filter backdrop-blur-md border-t border-royalGold/30 py-3 px-4" data-component-name="HomeLayout">
         <div className="max-w-4xl mx-auto flex justify-between">
           <motion.div 
             className="flex items-center space-x-6 mx-auto"

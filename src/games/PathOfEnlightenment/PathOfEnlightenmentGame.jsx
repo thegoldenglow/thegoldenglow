@@ -12,6 +12,18 @@ import GameMasteryDisplay from '../../components/molecules/GameMasteryDisplay';
 import RewardNotification from '../../components/molecules/RewardNotification';
 
 const PathOfEnlightenmentGame = () => {
+  // Add window size tracking for responsive design
+  const [windowHeight, setWindowHeight] = useState(window.innerHeight);
+  
+  // Update window dimensions on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowHeight(window.innerHeight);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const navigate = useNavigate();
   const { updateUserPoints } = useAuth();
   const { gameData, isUnlocked, loading, saveProgress, saveStats } = useGameState('path-of-enlightenment');
@@ -242,9 +254,9 @@ const PathOfEnlightenmentGame = () => {
             <Icon name="lock" size={32} color="#DAA520" />
           </div>
           <h2 className="text-xl font-primary text-royalGold mb-2">Game Locked</h2>
-          <p className="text-white/70 max-w-md mb-6">
+          <div className="mt-1 mb-2 relative w-full max-w-xs mx-auto">
             The path to enlightenment remains hidden. Continue your spiritual journey to unlock this mystical challenge.
-          </p>
+          </div>
           <Button 
             variant="primary" 
             onClick={() => navigate('/')}
@@ -262,7 +274,16 @@ const PathOfEnlightenmentGame = () => {
       gameType="puzzle"
       onBackClick={handleBack}
     >
-      <div className="flex flex-col items-center max-w-md mx-auto h-full overflow-hidden">
+      <div 
+        className="flex flex-col items-center max-w-md mx-auto h-full overflow-hidden"
+        style={{
+          // Use calculated height to ensure everything fits on screen
+          height: '100%',
+          maxHeight: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
         {/* Game intro */}
         {!gameStarted && !gameOver && (
           <motion.div 
@@ -276,7 +297,7 @@ const PathOfEnlightenmentGame = () => {
             <h1 className="text-2xl font-primary text-royalGold mb-3"></h1>
             <p className="text-white/80 mb-6"></p>
             
-            <div className="mb-6 p-4 bg-deepLapisLight/30 rounded-lg border border-royalGold/30">
+            <div className="mt-2 mb-auto mx-auto max-w-xs">
               <p className="text-royalGold font-medium mb-2">Your Best Achievements</p>
               <div className="flex justify-between">
                 <div>
@@ -407,7 +428,7 @@ const PathOfEnlightenmentGame = () => {
             exit={{ opacity: 0 }}
           >
             <motion.div 
-              className="bg-deepLapis border-2 border-royalGold rounded-lg max-w-md w-full p-5"
+              className="bg-deepLapis border-2 border-royalGold rounded-lg max-w-md w-full p-3"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.3 }}

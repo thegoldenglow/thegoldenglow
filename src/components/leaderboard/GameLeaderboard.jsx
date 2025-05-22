@@ -201,7 +201,7 @@ const GameLeaderboard = ({ data: propData, isLoading: propIsLoading, userId, gam
               {/* Score - visible on all screens */}
               <div className="col-span-4 sm:col-span-3 text-right font-mono">
                 <span className={`${entry.id === userId ? 'text-textGold' : 'text-royalGoldLight'} font-bold`}>
-                  {entry.points.toLocaleString()}
+                  {(entry.gameScore !== undefined ? entry.gameScore : entry.points).toLocaleString()}
                 </span>
                 <span className="text-xs text-royalGoldLight/60 ml-1">pts</span>
               </div>
@@ -210,7 +210,9 @@ const GameLeaderboard = ({ data: propData, isLoading: propIsLoading, userId, gam
               <div className="hidden sm:block sm:col-span-3 text-right">
                 <div className="inline-block px-3 py-1 rounded-full bg-deepLapis border border-royalGold/20 text-sm">
                   <span className="text-royalGoldLight/90">{gameType === 'all' ? 'Total: ' : 'Score: '}</span>
-                  <span className="text-textGold font-medium">{entry.points.toLocaleString()}</span>
+                  <span className="text-textGold font-medium">
+                    {(entry.gameScore !== undefined ? entry.gameScore : entry.points).toLocaleString()}
+                  </span>
                 </div>
               </div>
             </motion.div>

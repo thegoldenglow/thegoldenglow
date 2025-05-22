@@ -6,6 +6,7 @@ import { useGame } from '../../contexts/GameContext';
 import HomeLayout from '../templates/HomeLayout';
 import Button from '../atoms/Button';
 import Icon from '../atoms/Icon';
+import ReferralLinkBox from '../ReferralLinkBox';
 import { isValidUsername } from '../../utils/usernameGenerator';
 
 const ProfilePage = () => {
@@ -373,6 +374,17 @@ const ProfilePage = () => {
           </div>
         </motion.section>
         
+        {/* Referral section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="mb-8"
+        >
+          <h2 className="text-xl font-primary text-royalGold mb-4">Invite Friends</h2>
+          <ReferralLinkBox />
+        </motion.section>
+        
         {/* Achievements section */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
@@ -381,30 +393,67 @@ const ProfilePage = () => {
         >
           <h2 className="text-xl font-primary text-royalGold mb-4">Achievements</h2>
           
-          {user.achievements && user.achievements.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {user.achievements.map((achievement) => (
-                <div key={achievement.id} className="p-3 bg-deepLapisLight/20 rounded-lg border border-royalGold/20">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-royalGold/20 flex items-center justify-center mr-3">
-                      <Icon name={achievement.icon || 'star'} size={20} color="#DAA520" />
+          {(() => {
+            // Parse achievements from JSON if it's a string
+            let achievementsArray = [];
+            try {
+              if (user.achievements) {
+                if (typeof user.achievements === 'string') {
+                  try {
+                    const achievementsData = JSON.parse(user.achievements);
+                    // Make sure items is an array, otherwise use empty array
+                    if (achievementsData && achievementsData.items && Array.isArray(achievementsData.items)) {
+                      achievementsArray = achievementsData.items;
+                    } else {
+                      console.log('Achievements data exists but items is not an array:', achievementsData);
+                      achievementsArray = [];
+                    }
+                  } catch (parseError) {
+                    console.error('Error parsing achievements JSON:', parseError);
+                    achievementsArray = [];
+                  }
+                } else if (Array.isArray(user.achievements)) {
+                  achievementsArray = user.achievements;
+                } else {
+                  console.log('Achievements is not a string or array:', typeof user.achievements);
+                  achievementsArray = [];
+                }
+              }
+            } catch (error) {
+              console.error('Error handling achievements:', error);
+              achievementsArray = [];
+            }
+            
+            // Double-check that achievementsArray is actually an array before using map
+            if (Array.isArray(achievementsArray) && achievementsArray.length > 0) {
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {achievementsArray.map((achievement) => (
+                    <div key={achievement.id || Math.random()} className="p-3 bg-deepLapisLight/20 rounded-lg border border-royalGold/20">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 rounded-full bg-royalGold/20 flex items-center justify-center mr-3">
+                          <Icon name={achievement.icon || 'star'} size={20} color="#DAA520" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-royalGold">{achievement.name}</h3>
+                          <p className="text-sm text-white/70">{achievement.description}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-medium text-royalGold">{achievement.name}</h3>
-                      <p className="text-sm text-white/70">{achievement.description}</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-6 bg-deepLapisLight/20 rounded-lg text-center">
-              <p className="text-white/60 mb-3">No achievements earned yet</p>
-              <p className="text-sm text-white/50">
-                Continue your spiritual journey through the games to earn achievements and wisdom.
-              </p>
-            </div>
-          )}
+              );
+            } else {
+              return (
+                <div className="p-6 bg-deepLapisLight/20 rounded-lg text-center">
+                  <p className="text-white/60 mb-3">No achievements earned yet</p>
+                  <p className="text-sm text-white/50">
+                    Continue your spiritual journey through the games to earn achievements and wisdom.
+                  </p>
+                </div>
+              );
+            }
+          })()}
         </motion.section>
       </div>
     </HomeLayout>

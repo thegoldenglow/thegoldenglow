@@ -113,7 +113,7 @@ async function runTests() {
     
     // Test 3: Check all required tables
     console.log('\n📝 Test 3: Check all required tables');
-    const tables = ['profiles', 'analytics_users', 'analytics_games', 'tasks', 'task_completions'];
+    const tables = ['profiles', 'analytics_users', 'analytics_games', 'tasks', 'task_completions', 'referral_codes', 'referrals'];
     let allTablesAccessible = true;
     
     for (const table of tables) {

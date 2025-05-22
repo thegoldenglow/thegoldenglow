@@ -50,106 +50,102 @@ const LeaderboardPage = () => {
     try {
       console.log('Fetching leaderboard data for game:', selectedGame);
       
-      // For all games (overall ranking) or specific games, query the profiles table
-      // Since we're keeping it simple for now, we'll always use the profiles table
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, points, avatar_url, telegram_username')
-        .order('points', { ascending: false })
-        .limit(100);
+      let data, error;
+      
+      if (selectedGame === 'all') {
+        // For overall ranking, query the profiles table
+        ({ data, error } = await supabase
+          .from('profiles')
+          .select('id, username, points, avatar_url, telegram_username')
+          .order('points', { ascending: false })
+          .limit(100));
+      } else {
+        // For specific games, query the game_scores table
+        ({ data, error } = await supabase
+          .from('game_scores')
+          .select('id, profile_id, auth_user_id, score, created_at, profiles!game_scores_profile_id_fkey(id, username, avatar_url, telegram_username, points)')
+          .eq('game_name', selectedGame)
+          .order('score', { ascending: false })
+          .limit(100));
+      }
       
       if (error) {
         console.error('Supabase query error:', error);
         throw error;
       }
       
-      console.log('Fetched user data:', data?.length || 0, 'users');
+      console.log('Fetched data:', data?.length || 0, 'records');
       
-      // Always provide some default data for preview if database is empty
+      // Process and format data based on query type
+      let formattedData = [];
+      
       if (!data || data.length === 0) {
-        // Insert sample data if none exists
-        console.log('No leaderboard data found, adding demo users to database...');
-        try {
-          // Create some sample users if none exist
-          const demoUsers = [
-            { username: 'cosmic_wisdom123', points: 850, created_at: new Date().toISOString() },
-            { username: 'golden_seeker456', points: 720, created_at: new Date().toISOString() },
-            { username: 'testU1', points: 675, created_at: new Date().toISOString() },
-            { username: 'test_user2', points: 520, created_at: new Date().toISOString() },
-            { username: 'serene_lotus789', points: 450, created_at: new Date().toISOString() },
+        // No data found, use demo data based on the selected game
+        console.log('No leaderboard data found, using demo data');
+        
+        if (selectedGame === 'all') {
+          // Demo data for overall ranking
+          formattedData = [
+            { rank: 1, id: 'demo1', username: 'cosmic_wisdom123', points: 850, avatarUrl: null },
+            { rank: 2, id: 'demo2', username: 'golden_seeker456', points: 720, avatarUrl: null },
+            { rank: 3, id: 'demo3', username: 'testU1', points: 675, avatarUrl: null },
+            { rank: 4, id: 'demo4', username: 'test_user2', points: 520, avatarUrl: null },
+            { rank: 5, id: 'demo5', username: 'serene_lotus789', points: 450, avatarUrl: null }
           ];
-          
-          // Insert the users one by one to avoid conflicts
-          for (const demoUser of demoUsers) {
-            // Check if user already exists
-            const { data: existing } = await supabase
-              .from('profiles')
-              .select('id')
-              .eq('username', demoUser.username)
-              .single();
-              
-            if (!existing) {
-              await supabase.from('profiles').insert(demoUser);
-              console.log(`Added demo user: ${demoUser.username}`);
-            }
-          }
-          
-          // Fetch the data again
-          const { data: refreshedData } = await supabase
-            .from('profiles')
-            .select('id, username, points, avatar_url, telegram_username')
-            .order('points', { ascending: false })
-            .limit(100);
-            
-          if (refreshedData && refreshedData.length > 0) {
-            // Format and use the refreshed data
-            const formattedData = refreshedData.map((item, index) => ({
-              rank: index + 1,
-              id: item.id,
-              username: item.telegram_username || item.username,
-              points: item.points || 0,
-              avatarUrl: item.avatar_url
-            }));
-            
-            setLeaderboardData(formattedData);
-            
-            // Find user's rank in the leaderboard if user is logged in
-            if (user) {
-              const userRankData = formattedData.find(item => 
-                item.username === user.username || 
-                item.id === user.id ||
-                item.username === user.telegram_username
-              );
-              setUserRank(userRankData?.rank || null);
-            }
-            
-            setIsLoading(false);
-            return;
-          }
-        } catch (insertError) {
-          console.error('Error creating demo users:', insertError);
+        } else if (selectedGame === 'marks-of-destiny') {
+          // Demo data for Marks of Destiny game
+          formattedData = [
+            { rank: 1, id: 'demo1', username: 'cosmic_wisdom123', points: 950, avatarUrl: null, gameScore: 950 },
+            { rank: 2, id: 'demo2', username: 'golden_seeker456', points: 720, avatarUrl: null, gameScore: 850 },
+            { rank: 3, id: 'demo3', username: 'mystical_player', points: 600, avatarUrl: null, gameScore: 780 },
+            { rank: 4, id: 'demo4', username: 'destiny_finder', points: 580, avatarUrl: null, gameScore: 690 },
+            { rank: 5, id: 'demo5', username: 'mark_master', points: 530, avatarUrl: null, gameScore: 530 }
+          ];
+        } else {
+          // Demo data for other games
+          formattedData = [
+            { rank: 1, id: 'demo1', username: 'game_expert', points: 750, avatarUrl: null, gameScore: 750 },
+            { rank: 2, id: 'demo2', username: 'player_one', points: 680, avatarUrl: null, gameScore: 680 },
+            { rank: 3, id: 'demo3', username: 'skills_master', points: 620, avatarUrl: null, gameScore: 620 },
+            { rank: 4, id: 'demo4', username: 'game_guru', points: 550, avatarUrl: null, gameScore: 550 },
+            { rank: 5, id: 'demo5', username: 'top_player', points: 490, avatarUrl: null, gameScore: 490 }
+          ];
+        }
+      } else {
+        // Format real data from database
+        if (selectedGame === 'all') {
+          // Format overall ranking data
+          formattedData = data.map((user, index) => ({
+            rank: index + 1,
+            id: user.id,
+            username: user.username || `User-${user.id.substring(0, 6)}`,
+            points: user.points || 0,
+            avatarUrl: user.avatar_url
+          }));
+        } else {
+          // Format game-specific data from game_scores table
+          formattedData = data.map((record, index) => ({
+            rank: index + 1,
+            id: record.profiles?.id || record.profile_id,
+            username: record.profiles?.username || `User-${record.auth_user_id?.substring(0, 6)}`,
+            points: record.profiles?.points || 0,
+            avatarUrl: record.profiles?.avatar_url,
+            gameScore: record.score || 0
+          }));
         }
       }
       
-      // Format the data for the leaderboard component
-      const formattedData = data.map((item, index) => ({
-        rank: index + 1,
-        id: item.id,
-        username: item.telegram_username || item.username || `User-${item.id}`,
-        points: item.points || 0,
-        avatarUrl: item.avatar_url
-      }));
-      
+      // Set the formatted data to state
       setLeaderboardData(formattedData);
       
-      // Find user's rank in the leaderboard if user is logged in
-      if (user) {
-        const userRankData = formattedData.find(item => 
-          item.username === user.username || 
-          item.id === user.id ||
-          item.username === user.telegram_username
-        );
-        setUserRank(userRankData?.rank || null);
+      // Find and set user's rank if logged in
+      if (user?.id) {
+        const userRankItem = formattedData.find(item => item.id === user.id);
+        if (userRankItem) {
+          setUserRank(userRankItem.rank);
+        } else {
+          setUserRank(null); // Reset rank if user is not in the leaderboard
+        }
       }
     } catch (error) {
       console.error('Error fetching leaderboard data:', error);

@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
-import { validateTelegramWebAppData, getTelegramUser, initializeTelegramBot } from '../utils/telegramBot';
+import { 
+  validateTelegramWebAppData, 
+  getTelegramUser, 
+  initializeTelegramBot,
+  generateTelegramBotReferralLink,
+  getUserReferralCode,
+  trackReferral,
+  parseReferralStartParam
+} from '../utils/telegramBot';
 import { generateRandomUsername, isValidUsername, isUsernameAvailable } from '../utils/usernameGenerator';
 
 const UserContext = createContext();
@@ -17,6 +25,30 @@ export const UserProvider = ({ children }) => {
   useEffect(() => {
     const initializeUser = async () => {
       console.log('Initializing UserContext...');
+      
+      // Helper function to fetch referrals from the database
+      const fetchUserReferrals = async (userId) => {
+        if (!userId) return [];
+        
+        try {
+          // Fetch referrals where this user is the referrer
+          const { data, error } = await supabase
+            .from('referrals')
+            .select('*, referred_id(username, name, telegram_photo_url, created_at)')
+            .eq('referrer_id', userId)
+            .order('created_at', { ascending: false });
+            
+          if (error) {
+            console.error('Error fetching referrals:', error);
+            return [];
+          }
+          
+          return data || [];
+        } catch (fetchError) {
+          console.error('Error in fetchUserReferrals:', fetchError);
+          return [];
+        }
+      };
       try {
         // Check Supabase session first
         const { data: { session: supabaseSession } } = await supabase.auth.getSession();
@@ -43,7 +75,7 @@ export const UserProvider = ({ children }) => {
                 name: supabaseSession.user.user_metadata?.full_name || 'User',
                 lastName: '',
                 username: supabaseSession.user.email?.split('@')[0] || generateRandomUsername(),
-                avatar: null,
+                // Removing avatar as it doesn't exist in the database
                 points: 0,
                 createdAt: new Date().toISOString(),
                 achievements: [],
@@ -155,57 +187,37 @@ export const UserProvider = ({ children }) => {
               
               if (fetchError && fetchError.code === 'PGRST116') {
                 // User doesn't exist, create a new profile
+                // Create a database-compatible user object with only fields that exist in the profiles table
+                // We don't set user_id because it needs to reference a valid auth.users id
                 userData = {
-                  user_id: crypto.randomUUID(), // Generate a unique UUID for Supabase
+                  // user_id is set to null for Telegram users without Supabase auth
+                  // This avoids the foreign key constraint violation
+                  user_id: null,
                   username: tgUser.username || `user${tgUser.id}`,
                   bio: '',
                   telegram_id: tgUser.id.toString(),
                   telegram_username: tgUser.username || null,
                   telegram_photo_url: photoUrl,
-                  user_source: 'telegram_user',
-                  telegram_auth_date: new Date().toISOString(),
+                  telegram_first_name: tgUser.first_name || '',
+                  telegram_last_name: tgUser.last_name || '',
+                  telegram_auth_date: Math.floor(Date.now() / 1000),
                   points: 0, // Golden Credits
-                  name: tgUser.first_name || 'User',
-                  lastName: tgUser.last_name || '',
-                  avatar: photoUrl, // Use Telegram photo if available
-                  createdAt: new Date().toISOString(),
-                  achievements: [],
-                  badges: [],
-                  titles: [],
-                  profileFrames: [],
-                  cosmetics: [],
-                  selectedTitle: null,
-                  selectedFrame: null,
-                  selectedBadge: null,
-                  customStatus: '',
-                  prestige: 0,
-                  stats: {
-                    gamesPlayed: 0,
-                    highestScore: 0,
-                    totalTimePlayed: 0,
-                    loginStreak: 0,
-                    longestLoginStreak: 0,
-                    lastLogin: new Date().toISOString(),
-                    gameStats: {}
-                  }
-                };
-                
-                // For demo purposes, preserve points from localStorage if user exists
-                if (savedUser) {
-                  try {
-                    const parsedUser = JSON.parse(savedUser);
-                    userData.points = parsedUser.points || 0;
-                    userData.achievements = parsedUser.achievements || [];
-                    userData.badges = parsedUser.badges || [];
-                    userData.titles = parsedUser.titles || [];
-                    userData.profileFrames = parsedUser.profileFrames || [];
-                    userData.cosmetics = parsedUser.cosmetics || [];
-                    userData.selectedTitle = parsedUser.selectedTitle;
-                    userData.selectedFrame = parsedUser.selectedFrame;
-                    userData.selectedBadge = parsedUser.selectedBadge;
-                    userData.customStatus = parsedUser.customStatus || '';
-                    userData.prestige = parsedUser.prestige || 0;
-                    userData.stats = parsedUser.stats || {
+                  avatar_url: photoUrl, // Use Telegram photo if available
+                  created_at: new Date().toISOString(),
+                  user_type: 'telegram_user',
+                  // Store extended user data in the achievements jsonb field
+                  achievements: JSON.stringify({
+                    items: [],
+                    badges: [],
+                    titles: [],
+                    profileFrames: [],
+                    cosmetics: [],
+                    selectedTitle: null,
+                    selectedFrame: null,
+                    selectedBadge: null,
+                    customStatus: '',
+                    prestige: 0,
+                    stats: {
                       gamesPlayed: 0,
                       highestScore: 0,
                       totalTimePlayed: 0,
@@ -213,7 +225,55 @@ export const UserProvider = ({ children }) => {
                       longestLoginStreak: 0,
                       lastLogin: new Date().toISOString(),
                       gameStats: {}
+                    }
+                  })
+                };
+                
+                // For demo purposes, preserve points from localStorage if user exists
+                if (savedUser) {
+                  try {
+                    const parsedUser = JSON.parse(savedUser);
+                    // Update points from local storage
+                    userData.points = parsedUser.points || 0;
+                    
+                    // Create extended user data object
+                    const extendedUserData = {
+                      items: [],
+                      badges: [],
+                      titles: [],
+                      profileFrames: [],
+                      cosmetics: [],
+                      selectedTitle: null,
+                      selectedFrame: null,
+                      selectedBadge: null,
+                      customStatus: '',
+                      prestige: 0,
+                      stats: {
+                        gamesPlayed: 0,
+                        highestScore: 0,
+                        totalTimePlayed: 0,
+                        loginStreak: 0,
+                        longestLoginStreak: 0,
+                        lastLogin: new Date().toISOString(),
+                        gameStats: {}
+                      }
                     };
+                    
+                    // Copy data from saved user if available
+                    if (parsedUser.achievements) extendedUserData.items = parsedUser.achievements;
+                    if (parsedUser.badges) extendedUserData.badges = parsedUser.badges;
+                    if (parsedUser.titles) extendedUserData.titles = parsedUser.titles;
+                    if (parsedUser.profileFrames) extendedUserData.profileFrames = parsedUser.profileFrames;
+                    if (parsedUser.cosmetics) extendedUserData.cosmetics = parsedUser.cosmetics;
+                    if (parsedUser.selectedTitle) extendedUserData.selectedTitle = parsedUser.selectedTitle;
+                    if (parsedUser.selectedFrame) extendedUserData.selectedFrame = parsedUser.selectedFrame;
+                    if (parsedUser.selectedBadge) extendedUserData.selectedBadge = parsedUser.selectedBadge;
+                    if (parsedUser.customStatus) extendedUserData.customStatus = parsedUser.customStatus;
+                    if (parsedUser.prestige) extendedUserData.prestige = parsedUser.prestige;
+                    if (parsedUser.stats) extendedUserData.stats = parsedUser.stats;
+                    
+                    // Store all extended user data in the achievements jsonb field
+                    userData.achievements = JSON.stringify(extendedUserData);
                   } catch (e) {
                     console.warn('Error parsing saved user data:', e);
                   }
@@ -232,26 +292,25 @@ export const UserProvider = ({ children }) => {
                 
               } else if (existingProfile) {
                 // User exists, update the profile with latest Telegram data
+                // Only update fields that actually exist in the profiles table
                 userData = {
                   ...existingProfile,
                   telegram_username: tgUser.username || existingProfile.telegram_username,
                   telegram_photo_url: photoUrl || existingProfile.telegram_photo_url,
-                  telegram_auth_date: new Date().toISOString(),
-                  name: tgUser.first_name || existingProfile.name,
-                  lastName: tgUser.last_name || existingProfile.lastName,
-                  avatar: photoUrl || existingProfile.avatar
+                  telegram_auth_date: Math.floor(Date.now() / 1000),
+                  telegram_first_name: tgUser.first_name || existingProfile.telegram_first_name,
+                  telegram_last_name: tgUser.last_name || existingProfile.telegram_last_name
                 };
                 
-                // Update the user in Supabase
+                // Update the user in Supabase with only the fields that exist in the profiles table
                 const { error: updateError } = await supabase
                   .from('profiles')
                   .update({
                     telegram_username: userData.telegram_username,
                     telegram_photo_url: userData.telegram_photo_url,
                     telegram_auth_date: userData.telegram_auth_date,
-                    name: userData.name,
-                    lastName: userData.lastName,
-                    avatar: userData.avatar
+                    telegram_first_name: userData.telegram_first_name,
+                    telegram_last_name: userData.telegram_last_name
                   })
                   .eq('telegram_id', tgUser.id.toString());
                   
@@ -273,7 +332,7 @@ export const UserProvider = ({ children }) => {
                   name: tgUser.first_name || 'User',
                   lastName: tgUser.last_name || '',
                   username: tgUser.username || null,
-                  avatar: photoUrl,
+                  // avatar field removed as it doesn't exist in the database
                   points: 0,
                   createdAt: new Date().toISOString(),
                   achievements: [],
@@ -343,7 +402,7 @@ export const UserProvider = ({ children }) => {
                       points: parsedUser.points || 0,
                       name: parsedUser.name || 'User',
                       lastName: parsedUser.lastName || '',
-                      avatar: parsedUser.avatar,
+                      // avatar field removed as it doesn't exist in the database
                       created_at: new Date().toISOString()
                     };
                     
@@ -366,6 +425,26 @@ export const UserProvider = ({ children }) => {
                     const updatedUser = { ...parsedUser, ...existingUser };
                     setUser(updatedUser);
                     localStorage.setItem('gg_user', JSON.stringify(updatedUser));
+                    
+                    // Fetch user referrals from database
+                    const userId = existingUser.id || existingUser.user_id;
+                    if (userId) {
+                      try {
+                        // Fetch referrals where this user is the referrer
+                        const { data, error } = await supabase
+                          .from('referrals')
+                          .select('*')
+                          .eq('referrer_id', userId);
+                          
+                        if (!error && data && data.length > 0) {
+                          console.log(`Loaded ${data.length} referrals from database`);
+                          setReferrals(data);
+                          localStorage.setItem('gg_referrals', JSON.stringify(data));
+                        }
+                      } catch (refError) {
+                        console.error('Error fetching referrals:', refError);
+                      }
+                    }
                   }
                 } else {
                   // No username, just use the localStorage user
@@ -524,7 +603,7 @@ export const UserProvider = ({ children }) => {
         name: 'Demo User',
         lastName: '',
         username: generateRandomUsername(),
-        avatar: null,
+        // avatar field removed as it doesn't exist in the database
         points: 0,
         createdAt: new Date().toISOString(),
         achievements: [],
@@ -988,8 +1067,65 @@ export const UserProvider = ({ children }) => {
     return `${baseUrl}?ref=${user.id}`;
   }, [user]);
   
+  // Get user referrals from the database
+  const getUserReferrals = useCallback(async () => {
+    if (!user) return [];
+    
+    try {
+      // Get user ID
+      const userId = user.id || user.user_id || (user.telegram_id ? user.telegram_id : null);
+      
+      if (!userId) {
+        console.warn('Cannot fetch referrals: No valid user ID');
+        return [];
+      }
+      
+      // Fetch referrals from database
+      const { data, error } = await supabase
+        .from('referrals')
+        .select(`
+          id,
+          referrer_id,
+          referred_id,
+          code_used,
+          created_at,
+          reward_claimed,
+          points_awarded,
+          profiles:referred_id(username, name, telegram_photo_url)
+        `)
+        .eq('referrer_id', userId)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching referrals:', error);
+        return [];
+      }
+      
+      // Process the data for display
+      const processedReferrals = (data || []).map(ref => ({
+        id: ref.id,
+        referrerId: ref.referrer_id,
+        referredId: ref.referred_id,
+        codeUsed: ref.code_used,
+        createdAt: ref.created_at,
+        rewardClaimed: ref.reward_claimed,
+        pointsAwarded: ref.points_awarded,
+        referredUser: ref.profiles || { username: 'Unknown User' }
+      }));
+      
+      // Update state and localStorage
+      setReferrals(processedReferrals);
+      localStorage.setItem('gg_referrals', JSON.stringify(processedReferrals));
+      
+      return processedReferrals;
+    } catch (error) {
+      console.error('Error in getUserReferrals:', error);
+      return [];
+    }
+  }, [user, supabase]);
+  
   // Generate a Telegram-specific referral link
-  const generateTelegramReferralLink = useCallback(() => {
+  const generateTelegramReferralLink = useCallback(async () => {
     if (!user) return null;
     
     // Determine the appropriate user ID to use
@@ -998,23 +1134,31 @@ export const UserProvider = ({ children }) => {
     
     if (!userId) {
       console.warn('No valid user ID found for referral link generation');
-      return 'https://t.me/test_user?start=demo';
+      return 'https://t.me/TheGoldenGlow_bot?start=demo';
     }
     
-    // Check if we're in a Telegram WebApp context
-    if (window.Telegram?.WebApp) {
-      // Get bot username from Telegram WebApp if available
-      const botUsername = window.Telegram.WebApp.initDataUnsafe?.user?.username || 'goldenglow_bot';
-      return `https://t.me/${botUsername}?start=${userId}`;
-    } else {
-      // Fallback to web URL with ref parameter if not in Telegram
-      const baseUrl = window.location.origin;
-      return `${baseUrl}?ref=${userId}`;
+    // Use the enhanced referral link generator that creates a unique code
+    const referralLink = await generateTelegramBotReferralLink(userId);
+    return referralLink;
+  }, [user]);
+  
+  // Get the user's referral code (for display purposes)
+  const getReferralCode = useCallback(async () => {
+    if (!user) return null;
+    
+    const userId = user.telegram_id || user.id || user.user_id || null;
+    if (!userId) return null;
+    
+    try {
+      return await getUserReferralCode(userId);
+    } catch (error) {
+      console.error('Error getting referral code:', error);
+      return null;
     }
   }, [user]);
   
   // Record a successful referral
-  const recordReferral = useCallback((referredUserId, referredUsername = null) => {
+  const recordReferral = useCallback(async (referredUserId, referredUsername = null, referralCode = null) => {
     if (!user) return;
     
     // Check if user is already in referrals
@@ -1024,12 +1168,22 @@ export const UserProvider = ({ children }) => {
       userId: referredUserId,
       username: referredUsername,
       timestamp: new Date().toISOString(),
-      bonusCollected: false
+      bonusCollected: false,
+      referralCode: referralCode
     };
     
     const updatedReferrals = [...referrals, newReferral];
     setReferrals(updatedReferrals);
     localStorage.setItem('gg_referrals', JSON.stringify(updatedReferrals));
+    
+    // If we have a referral code, track it in the database
+    if (referralCode) {
+      try {
+        await trackReferral(referralCode, referredUserId);
+      } catch (error) {
+        console.error('Error tracking referral in database:', error);
+      }
+    }
     
     // Check for milestone rewards
     const milestones = [5, 10, 25, 50];
@@ -1142,6 +1296,31 @@ export const UserProvider = ({ children }) => {
     };
   }, [user]);
 
+  // Process a Telegram deep link start parameter
+  const processStartParameter = useCallback(async (startParam) => {
+    if (!startParam || !user) return null;
+    
+    try {
+      // Parse the start parameter to check if it's a referral code
+      const referralInfo = await parseReferralStartParam(startParam);
+      
+      if (referralInfo && referralInfo.referrerUserId !== user.id) {
+        // Record this referral
+        await recordReferral(referralInfo.referrerUserId, null, referralInfo.referralCode);
+        
+        // Award points to the new user for using a referral
+        updateUserPoints(50, { referralBonus: true });
+        
+        return referralInfo;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error processing start parameter:', error);
+      return null;
+    }
+  }, [user, recordReferral, updateUserPoints]);
+
   return (
     <UserContext.Provider value={{
       user,
@@ -1162,9 +1341,12 @@ export const UserProvider = ({ children }) => {
       updateSelectedCustomizations,
       generateReferralLink,
       generateTelegramReferralLink,
+      getReferralCode,
       recordReferral,
+      processStartParameter,
       getUserLevel,
       referrals,
+      getUserReferrals,
       authToken,
       session,
       updateUsername

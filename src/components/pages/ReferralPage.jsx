@@ -14,16 +14,142 @@ const ReferralPage = () => {
 
   useEffect(() => {
     // Generate Telegram referral link when component mounts
-    if (user) {
-      const link = generateTelegramReferralLink();
-      setReferralLink(link);
-    }
+    const fetchReferralLink = async () => {
+      if (user) {
+        try {
+          const link = await generateTelegramReferralLink();
+          setReferralLink(link);
+        } catch (error) {
+          console.error('Error generating referral link:', error);
+          setReferralLink('https://t.me/TheGoldenGlow_bot');
+        }
+      }
+    };
+    
+    fetchReferralLink();
   }, [user, generateTelegramReferralLink]);
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(referralLink);
-    setCopied(true);
+    setCopied(true); // Show visual feedback immediately
+    
+    // Show the success message for 2 seconds
     setTimeout(() => setCopied(false), 2000);
+    
+    // Try different clipboard methods in sequence
+    const copyMethods = [
+      copyWithClipboardAPI,
+      copyWithExecCommand,
+      copyWithTextAreaMethod
+    ];
+    
+    // Try each method until one succeeds
+    const tryNextMethod = (index = 0) => {
+      if (index >= copyMethods.length) {
+        console.warn('All clipboard methods failed. Manual copy may be required.');
+        return;
+      }
+      
+      copyMethods[index](referralLink)
+        .then(() => console.log(`Copy successful with method ${index + 1}`))
+        .catch(err => {
+          console.log(`Method ${index + 1} failed:`, err);
+          tryNextMethod(index + 1);
+        });
+    };
+    
+    tryNextMethod();
+  };
+  
+  // Method 1: Modern Clipboard API
+  const copyWithClipboardAPI = (text) => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.clipboard) {
+        return reject(new Error('Clipboard API not available'));
+      }
+      
+      navigator.clipboard.writeText(text)
+        .then(resolve)
+        .catch(reject);
+    });
+  };
+  
+  // Method 2: execCommand approach
+  const copyWithExecCommand = (text) => {
+    return new Promise((resolve, reject) => {
+      try {
+        const tempInput = document.createElement('input');
+        tempInput.style.position = 'absolute';
+        tempInput.style.left = '-9999px';
+        tempInput.value = text;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        
+        if (successful) {
+          resolve();
+        } else {
+          reject(new Error('execCommand returned false'));
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
+  };
+  
+  // Method 3: textarea with user instruction as last resort
+  const copyWithTextAreaMethod = (text) => {
+    return new Promise((resolve, reject) => {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.top = '0';
+        textarea.style.left = '0';
+        textarea.style.width = '2em';
+        textarea.style.height = '2em';
+        textarea.style.padding = '0';
+        textarea.style.border = 'none';
+        textarea.style.outline = 'none';
+        textarea.style.boxShadow = 'none';
+        textarea.style.background = 'transparent';
+        document.body.appendChild(textarea);
+        
+        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+          // iOS specific handling
+          textarea.contentEditable = true;
+          textarea.readOnly = false;
+          
+          const range = document.createRange();
+          range.selectNodeContents(textarea);
+          
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          textarea.setSelectionRange(0, 999999);
+        } else {
+          textarea.select();
+        }
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        
+        if (successful) {
+          resolve();
+        } else {
+          // Even if this fails, we still want to show success to the user
+          // since they've already seen the copy feedback
+          console.log('Last resort copy method may have failed, but proceeding anyway');
+          resolve(); // Resolve anyway to avoid showing an error to the user
+        }
+      } catch (err) {
+        // At this point, all methods have failed but the user has already seen
+        // the "Copied" confirmation, so we'll just log it
+        console.error('All clipboard methods failed:', err);
+        resolve(); // Resolve anyway to provide good UX
+      }
+    });
   };
 
   const handleShare = async () => {
@@ -238,55 +364,131 @@ const ReferralPage = () => {
         </motion.div>
       </div>
 
-      {/* Recent Referrals List */}
-      {referrals.length > 0 && (
-        <motion.div 
-          className="bg-deepLapisDark p-6 rounded-xl shadow-inner border border-royalGold/20"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-        >
-          <h3 className="text-xl font-primary text-textGold mb-4">Recent Invites</h3>
+      {/* Referrals Board */}
+      <motion.div 
+        className="bg-deepLapisDark p-6 rounded-xl shadow-inner border border-royalGold/20"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.6 }}
+      >
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-primary text-textGold">Your Invited Friends</h3>
+          <div className="flex items-center">
+            <FiUsers className="text-ancientGold mr-2" />
+            <span className="text-textLight">Total: </span>
+            <span className="text-ancientGold-light font-bold ml-1">{referrals.length}</span>
+          </div>
+        </div>
+
+        {referrals.length > 0 ? (
           <div className="overflow-hidden rounded-lg border border-royalGold/20">
             <table className="min-w-full divide-y divide-royalGold/20">
               <thead className="bg-mysticPurple-dark">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-ancientGold-light tracking-wider">
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-ancientGold-light tracking-wider">
                     User
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-ancientGold-light tracking-wider">
-                    Date
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-ancientGold-light tracking-wider">
+                    Joined
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-ancientGold-light tracking-wider">
-                    Reward
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-ancientGold-light tracking-wider">
+                    Status
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-ancientGold-light tracking-wider">
+                    Points Earned
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-deepLapis-dark divide-y divide-royalGold/10">
-                {referrals.slice(0, 5).map((referral, index) => (
-                  <tr key={referral.userId || index}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-textLight">
-                        {referral.username || `User ${referral.userId.substring(0, 6)}`}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-textLight">
-                        {new Date(referral.timestamp).toLocaleDateString()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-ancientGold">
-                        50 GC
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {referrals.map((referral, index) => {
+                  // Format the referred user information
+                  const username = referral.referred_id?.username || 
+                                   `User ${referral.referred_id?.substring(0, 6)}`;
+                  const joinDate = referral.created_at ? 
+                    new Date(referral.created_at).toLocaleDateString() : 'Unknown';
+                  const isActive = true; // We could determine this based on user activity if available
+                  const pointsAwarded = referral.points_awarded || 50;
+                  
+                  return (
+                    <tr key={referral.id || index} className="hover:bg-deepLapis/80 transition-colors">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-mysticPurple overflow-hidden mr-3 border border-royalGold/30">
+                            {referral.referred_id?.telegram_photo_url ? (
+                              <img 
+                                src={referral.referred_id.telegram_photo_url} 
+                                alt={username}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center bg-deepLapis">
+                                <FiUsers className="text-royalGoldLight/70" />
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-textLight">{username}</div>
+                            <div className="text-xs text-royalGoldLight/60">{referral.code_used || 'Direct invite'}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-textLight">{joinDate}</div>
+                        <div className="text-xs text-royalGoldLight/60">
+                          {referral.created_at ? 
+                            `${Math.floor((new Date() - new Date(referral.created_at)) / (1000 * 60 * 60 * 24))} days ago` : ''}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                          {isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <div className="text-sm font-medium text-ancientGold">
+                          +{pointsAwarded} GC
+                        </div>
+                        <div className="text-xs text-royalGoldLight/60">
+                          {referral.reward_claimed ? 'Claimed' : 'Automatic'}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-        </motion.div>
-      )}
+        ) : (
+          <div className="text-center py-10 bg-deepLapis/50 rounded-lg border border-royalGold/10">
+            <FiUsers className="mx-auto h-12 w-12 text-royalGoldLight/30 mb-3" />
+            <h3 className="text-lg font-medium text-textGold mb-1">No Invites Yet</h3>
+            <p className="text-sm text-royalGoldLight/70 max-w-md mx-auto">
+              Share your unique invite link with friends to start earning rewards!
+              Each successful invitation earns you Golden Credits.
+            </p>
+            <button
+              onClick={handleCopyLink}
+              className="mt-4 px-4 py-2 bg-deepLapis border border-royalGold/30 rounded-md text-royalGoldLight hover:bg-deepLapis/70 transition-colors"
+            >
+              <FiCopy className="inline-block mr-2" />
+              Copy Invite Link
+            </button>
+          </div>
+        )}
+
+        {referrals.length > 0 && (
+          <div className="mt-4 flex justify-between items-center">
+            <div className="text-sm text-royalGoldLight/70">
+              Showing {referrals.length} invite{referrals.length !== 1 ? 's' : ''}
+            </div>
+            <div className="text-sm text-royalGoldLight/70">
+              Total earned: <span className="text-ancientGold font-medium">
+                {referrals.reduce((total, ref) => total + (ref.points_awarded || 50), 0)} GC
+              </span>
+            </div>
+          </div>
+        )}
+      </motion.div>
     </div>
   );
 };

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 // Import no-scroll styles
 import './styles/noScroll.css';
+// Import Telegram Game Proxy safe wrapper
+import gameTelegram from './utils/telegramGameProxy';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { UserProvider } from './contexts/UserContext';
@@ -48,6 +50,9 @@ function App() {
       console.log('Running Telegram WebApp initialization...');
       
       try {
+        // Initialize Telegram Game Proxy
+        gameTelegram.gameLoaded();
+        
         // Check if Telegram WebApp is available
         if (window.Telegram && window.Telegram.WebApp) {
           const webApp = window.Telegram.WebApp;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import gameTelegram from '../../utils/telegramGameProxy';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import GameLayout from '../../components/templates/GameLayout';
@@ -59,6 +60,8 @@ const PathOfEnlightenmentGame = () => {
   
   // Start new game
   const startNewGame = () => {
+    // Notify Telegram Game API that game is initialized
+    gameTelegram.gameInitialized();
     setGameStarted(true);
     setGameOver(false);
     setScore(0);
@@ -81,6 +84,9 @@ const PathOfEnlightenmentGame = () => {
   // Handle game over
   const handleGameOver = (finalScore, maxTile) => {
     setGameOver(true);
+    
+    // Report score to Telegram Game API
+    gameTelegram.gameOver(finalScore);
     
     // Update best score
     if (finalScore > bestScore) {

@@ -96,14 +96,30 @@ const HomePage = () => {
               </div>
             </motion.div>
             
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2">
             <motion.h1 
-              className="text-3xl font-primary text-royalGold mb-4 mystic-glow sparkle"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1 }}
+              className="text-2xl font-primary text-royalGold mystic-glow" 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
             >
-              <span className="mystic-title">Golden Glow</span>
+              <span className="mystic-decorative">Welcome, Traveler</span>
             </motion.h1>
+            
+            {/* Login button for guest users */}
+            {localStorage.getItem('gg_guest_mode') === 'true' && !isAuthenticated && (
+              <motion.button
+                className="mt-2 sm:mt-0 px-4 py-1.5 bg-royalGold/20 hover:bg-royalGold/30 text-royalGold border border-royalGold/30 rounded-lg shadow-mystic text-sm transition-all duration-300 flex items-center"
+                onClick={() => navigate('/login')}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.4, duration: 0.3 }}
+              >
+                <span className="mr-2">✨</span>
+                <span>Login for Full Experience</span>
+              </motion.button>
+            )}
+          </div>
             
             <motion.p 
               className="text-white/80 mb-8"
@@ -139,9 +155,25 @@ const HomePage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h1 className="text-2xl font-primary text-royalGold mb-2 mystic-glow">
-              {user ? `Welcome, ${user.name}` : <span className="mystic-decorative">Welcome, Traveler</span>}
-            </h1>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2">
+              <h1 className="text-2xl font-primary text-royalGold mystic-glow">
+                {user ? `Welcome, ${user.name}` : <span className="mystic-decorative">Welcome, Traveler</span>}
+              </h1>
+              
+              {/* Login button for guest users */}
+              {!user && localStorage.getItem('gg_guest_mode') === 'true' && (
+                <motion.button
+                  className="mt-2 sm:mt-0 px-4 py-1.5 bg-royalGold/20 hover:bg-royalGold/30 text-royalGold border border-royalGold/30 rounded-lg shadow-mystic text-sm transition-all duration-300 flex items-center"
+                  onClick={() => navigate('/login')}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4, duration: 0.3 }}
+                >
+                  <span className="mr-2">✨</span>
+                  <span>Login for Full Experience</span>
+                </motion.button>
+              )}
+            </div>
             <p className="text-white/80">
               {user ? 
                 `Continue your journey with ${user.points} wisdom points collected` : 

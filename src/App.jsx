@@ -4,6 +4,19 @@ import './styles/noScroll.css';
 // Import Telegram Game Proxy safe wrapper
 import gameTelegram from './utils/telegramGameProxy';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+
+// Web3 Wallet imports
+import { Web3Modal, Web3Button } from '@web3modal/react';
+import { WagmiConfig, createConfig, http } from 'wagmi';
+import { mainnet, polygon, base } from 'wagmi/chains';
+
+// Solana wallet adapter imports
+import { ConnectionProvider, WalletProvider as SolanaWalletProvider } from '@solana/wallet-adapter-react';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
+import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
+import { clusterApiUrl } from '@solana/web3.js';
+
+// Context Providers
 import { ThemeProvider } from './contexts/ThemeContext';
 import { UserProvider } from './contexts/UserContext';
 import { GameProvider } from './contexts/GameContext';
@@ -11,9 +24,14 @@ import { TasksProvider } from './contexts/TasksContext';
 import { RewardProvider } from './contexts/RewardContext';
 import { WalletProvider } from './contexts/WalletContext';
 import { GameRewardProvider } from './contexts/GameRewardContext';
-import TelegramAuthManager from './components/auth/TelegramAuthManager';
+
+// Auth Components
+import WalletAuthManager from './components/auth/WalletAuthManager';
+
+// Pages
 import HomePage from './components/pages/HomePage';
 import ProfilePage from './components/pages/ProfilePage';
+import LoginPage from './components/pages/LoginPage';
 import DailyTasksPage from './components/pages/DailyTasksPage';
 import RewardsPage from './components/pages/RewardsPage';
 import ReferralPage from './components/pages/ReferralPage';
@@ -29,8 +47,28 @@ import NoScrollWrapper from './components/NoScrollWrapper';
 import MysticalTapJourneyGame from './games/MysticalTapJourney/MysticalTapJourneyGame';
 import TicTacToe from './games/TicTacToe/TicTacToe';
 
+// Configure Solana wallet adapter
+const network = WalletAdapterNetwork.Devnet;
+const endpoint = clusterApiUrl(network);
+const wallets = [new PhantomWalletAdapter()];
+
+// Configure EVM wallets
+const chains = [mainnet, polygon, base];
+const wagmiConfig = createConfig({
+  chains,
+  transports: {
+    [mainnet.id]: http(),
+    [polygon.id]: http(),
+    [base.id]: http(),
+  },
+});
+
+// Web3Modal configuration
+const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'demo'; // Use 'demo' for testing, get real ID from https://cloud.walletconnect.com
+
+
 function App() {
-  // State to track if the app is initialized with Telegram WebApp
+  // State to track if the app is initialized
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -157,21 +195,32 @@ function App() {
   }
 
   return (
-    <ThemeProvider>
-      <UserProvider>
-        <RewardProvider>
-          <WalletProvider>
-            <GameProvider>
-              <GameRewardProvider>
-                <TasksProvider>
-                  <Router>
-                    <div 
-                      className="min-h-screen bg-deepLapis bg-pattern-stars text-textLight relative"
-                    >
-                      {/* Telegram Auth Manager - automatically authenticates users from Telegram */}
-                      <TelegramAuthManager />
-                      
-                      {/* Decorative top border */}
+    <ConnectionProvider endpoint={endpoint}>
+      <SolanaWalletProvider wallets={wallets} autoConnect>
+        <WagmiConfig config={wagmiConfig}>
+          <ThemeProvider>
+            <UserProvider>
+              <RewardProvider>
+                <WalletProvider>
+                  <GameProvider>
+                    <GameRewardProvider>
+                      <TasksProvider>
+                        <Router>
+                          <div 
+                            className="min-h-screen bg-deepLapis bg-pattern-stars text-textLight relative"
+                          >
+                            {/* Wallet Auth Manager - handles wallet authentication */}
+                            <WalletAuthManager />
+                            
+                            {/* Web3Modal component for wallet connections */}
+                            <Web3Modal 
+                              projectId={projectId}
+                              ethereumClient={wagmiConfig}
+                              themeMode="dark" 
+                              themeColor="gold"
+                            />
+                            
+                            {/* Decorative top border */}
                       <div className="h-1 w-full bg-gradient-gold absolute top-0 left-0 shadow-glow z-10"></div>
                       <NoScrollWrapper>
                         <div 
@@ -187,6 +236,7 @@ function App() {
                         <Routes>
                           <Route path="/" element={<HomePage />} />
                           <Route path="/profile" element={<ProfilePage />} />
+                          <Route path="/login" element={<LoginPage />} />
                           <Route path="/daily-tasks" element={<DailyTasksPage />} />
                           <Route path="/rewards" element={<RewardsPage />} />
                           <Route path="/referral" element={<ReferralPage />} />
@@ -215,6 +265,9 @@ function App() {
         </RewardProvider>
       </UserProvider>
     </ThemeProvider>
+    </WagmiConfig>
+      </SolanaWalletProvider>
+    </ConnectionProvider>
   );
 }
 

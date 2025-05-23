@@ -139,10 +139,10 @@ const GameLeaderboard = ({ data: propData, isLoading: propIsLoading, userId, gam
   return (
     <div className="w-full">
       {/* Leaderboard header */}
-      <div className="grid grid-cols-12 gap-4 py-3 px-4 bg-deepLapis/50 rounded-t-lg border-b border-royalGold/20 text-royalGoldLight/90 font-medium">
+      <div className="grid grid-cols-12 gap-2 sm:gap-4 py-3 px-4 bg-deepLapis/50 rounded-t-lg border-b border-royalGold/20 text-royalGoldLight/90 font-medium">
         <div className="col-span-1 text-center">#</div>
-        <div className="col-span-7 sm:col-span-5">Player</div>
-        <div className="col-span-4 sm:col-span-3 text-right">Score</div>
+        <div className="col-span-6 sm:col-span-5">Player</div>
+        <div className="col-span-5 sm:col-span-3 text-right">Score</div>
         <div className="hidden sm:block sm:col-span-3 text-right">
           {gameType === 'all' ? 'Total Points' : 'Game Score'}
         </div>
@@ -159,7 +159,7 @@ const GameLeaderboard = ({ data: propData, isLoading: propIsLoading, userId, gam
           {data.map((entry) => (
             <motion.div
               key={entry.id + "-" + entry.rank}
-              className={`grid grid-cols-12 gap-4 py-3 px-4 items-center ${
+              className={`grid grid-cols-12 gap-2 sm:gap-4 py-3 px-4 items-center ${
                 entry.id === userId ? 'bg-royalGoldLight/10' : ''
               } hover:bg-deepLapis/70 transition-colors duration-200`}
               variants={itemVariants}
@@ -176,8 +176,8 @@ const GameLeaderboard = ({ data: propData, isLoading: propIsLoading, userId, gam
               </div>
 
               {/* Player name and avatar */}
-              <div className="col-span-7 sm:col-span-5 flex items-center">
-                <div className="w-8 h-8 rounded-full bg-deepLapis border border-royalGold/30 flex items-center justify-center mr-3 overflow-hidden">
+              <div className="col-span-6 sm:col-span-5 flex items-center">
+                <div className="w-8 h-8 rounded-full bg-deepLapis border border-royalGold/30 flex items-center justify-center mr-2 sm:mr-3 overflow-hidden flex-shrink-0">
                   {entry.avatarUrl ? (
                     <img 
                       src={entry.avatarUrl} 
@@ -188,8 +188,8 @@ const GameLeaderboard = ({ data: propData, isLoading: propIsLoading, userId, gam
                     <Icon name="profile" size={16} className="text-royalGoldLight/70" />
                   )}
                 </div>
-                <div>
-                  <p className={`font-medium ${entry.id === userId ? 'text-textGold' : 'text-royalGoldLight'}`}>
+                <div className="min-w-0"> {/* Add min-width to enable text truncation */}
+                  <p className={`font-medium truncate max-w-[120px] sm:max-w-full ${entry.id === userId ? 'text-textGold' : 'text-royalGoldLight'}`}>
                     {entry.username}
                   </p>
                   {entry.id === userId && (
@@ -199,7 +199,7 @@ const GameLeaderboard = ({ data: propData, isLoading: propIsLoading, userId, gam
               </div>
 
               {/* Score - visible on all screens */}
-              <div className="col-span-4 sm:col-span-3 text-right font-mono">
+              <div className="col-span-5 sm:col-span-3 text-right font-mono pl-1">
                 <span className={`${entry.id === userId ? 'text-textGold' : 'text-royalGoldLight'} font-bold`}>
                   {(entry.gameScore !== undefined ? entry.gameScore : entry.points).toLocaleString()}
                 </span>

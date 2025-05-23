@@ -55,9 +55,11 @@ export default {
         overlay: 'rgba(26, 35, 126, 0.85)',
       },
       fontFamily: {
-        primary: ["'Amiri'", "'serif'"],
-        secondary: ["'Poppins'", "'sans-serif'"],
+        primary: ["'Cinzel'", "'Amiri'", "'serif'"],
+        secondary: ["'Philosopher'", "'Poppins'", "'sans-serif'"],
         calligraphy: ["'Scheherazade New'", "'serif'"],
+        mysticDisplay: ["'Cinzel'", "'serif'"],
+        mysticBody: ["'Philosopher'", "'sans-serif'"],
       },
       backgroundImage: {
         'gradient-mystical': 'linear-gradient(135deg, #1A237E 0%, #4A148C 100%)',

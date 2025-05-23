@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -7,8 +7,23 @@ import Icon from '../atoms/Icon';
 
 const HomeLayout = ({ children }) => {
   const { theme } = useTheme();
-  const { user } = useUser();
-  
+  const { user, anonymousUserScore, isLoading: isUserLoading } = useUser();
+  const [displayScore, setDisplayScore] = useState(0);
+
+  useEffect(() => {
+    if (isUserLoading) {
+      return;
+    }
+
+    if (user && user.points !== undefined) {
+      setDisplayScore(user.points);
+    } else if (!user) { // For anonymous users, after loading
+      // UserContext is expected to provide anonymousUserScore,
+      // initialized from localStorage or as a default (e.g., 0).
+      setDisplayScore(anonymousUserScore !== undefined ? anonymousUserScore : 0);
+    }
+  }, [user, anonymousUserScore, isUserLoading]);
+
   return (
     <div className="min-h-screen text-white relative overflow-y-auto pb-20"> {/* Added padding at bottom to prevent content from being hidden behind fixed footer */}
       {/* Background decorative elements - REMOVED */}
@@ -34,12 +49,11 @@ const HomeLayout = ({ children }) => {
           </Link>
           
           <div className="flex items-center">
-            {user && (
-              <div className="flex items-center mr-2">
-                <Icon name="wisdom" color="#DAA520" size={16} className="mr-1" />
-                <span className="text-royalGold font-medium">{user.points}</span>
-              </div>
-            )}
+            {/* Always display score section */}
+            <div className="flex items-center mr-2">
+              <Icon name="wisdom" color="#DAA520" size={16} className="mr-1" />
+              <span className="text-royalGold font-medium" data-component-name="HomeLayout">{displayScore}</span>
+            </div>
             
             <Link to="/profile" className="p-2">
               <div className="w-8 h-8 rounded-full flex items-center justify-center">

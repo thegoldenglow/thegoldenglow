@@ -27,7 +27,6 @@ const HomePage = () => {
   const { dailyLogin, wheelOfDestiny } = useReward();
   
   const [showIntro, setShowIntro] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState('all');
   
   // Load games when component mounts
   useEffect(() => {
@@ -37,35 +36,38 @@ const HomePage = () => {
     const hasSeenIntro = localStorage.getItem('hasSeenIntro');
     if (hasSeenIntro) {
       setShowIntro(false);
+      
+      // Check if we have user data in localStorage or guest mode is active
+      const storedUser = localStorage.getItem('gg_user');
+      const guestMode = localStorage.getItem('gg_guest_mode') === 'true';
+      
+      // Only redirect to login if not authenticated AND no stored user data AND not in guest mode
+      if (!isAuthenticated && !storedUser && !guestMode) {
+        console.log('HomePage: User not authenticated and no stored user data, redirecting to login');
+        navigate('/login');
+      } else {
+        console.log('HomePage: User is authenticated, has stored data, or is in guest mode, staying on homepage');
+        // User is either authenticated, has data in localStorage, or has chosen guest mode
+      }
     }
-  }, [loadGames]);
+  }, [loadGames, isAuthenticated, navigate]);
   
   // Handle intro completion
   const handleIntroComplete = () => {
     setShowIntro(false);
     localStorage.setItem('hasSeenIntro', 'true');
     
-    // If not authenticated, prompt login
-    if (!isAuthenticated) {
-      login();
+    // Check if in guest mode
+    const guestMode = localStorage.getItem('gg_guest_mode') === 'true';
+    
+    // Redirect to login page unless already authenticated or in guest mode
+    if (!isAuthenticated && !guestMode) {
+      navigate('/login');
     }
   };
   
-  // Filter games by category
-  const filteredGames = selectedCategory === 'all' 
-    ? games 
-    : games.filter(game => game.category === selectedCategory);
-  
-  // Game categories
-  const categories = [
-    { id: 'all', name: 'All Games' },
-    { id: 'strategy', name: 'Strategy' },
-    { id: 'puzzle', name: 'Puzzle' },
-    { id: 'rhythm', name: 'Rhythm' },
-    { id: 'clicker', name: 'Clicker' },
-    { id: 'quiz', name: 'Quiz' },
-    { id: 'journey', name: 'Journey' }
-  ];
+  // Use all games without filtering
+  const filteredGames = games;
 
   return (
     <HomeLayout>
@@ -95,12 +97,12 @@ const HomePage = () => {
             </motion.div>
             
             <motion.h1 
-              className="text-3xl font-primary text-royalGold mb-4"
+              className="text-3xl font-primary text-royalGold mb-4 mystic-glow sparkle"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 1 }}
             >
-              Golden Glow
+              <span className="mystic-title">Golden Glow</span>
             </motion.h1>
             
             <motion.p 
@@ -137,8 +139,8 @@ const HomePage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h1 className="text-2xl font-primary text-royalGold mb-2">
-              {user ? `Welcome, ${user.name}` : 'Welcome, Traveler'}
+            <h1 className="text-2xl font-primary text-royalGold mb-2 mystic-glow">
+              {user ? `Welcome, ${user.name}` : <span className="mystic-decorative">Welcome, Traveler</span>}
             </h1>
             <p className="text-white/80">
               {user ? 
@@ -148,21 +150,7 @@ const HomePage = () => {
             </p>
           </motion.div>
           
-          {/* Category filters */}
-          <div className="mb-6 overflow-x-auto pb-2">
-            <div className="flex space-x-2">
-              {categories.map(category => (
-                <Button
-                  key={category.id}
-                  variant={selectedCategory === category.id ? "primary" : "outline"}
-                  size="small"
-                  onClick={() => setSelectedCategory(category.id)}
-                >
-                  {category.name}
-                </Button>
-              ))}
-            </div>
-          </div>
+          {/* Category filters removed */}
           
           {/* Games grid / carousel */}
           {/* Swiper for small screens */}
@@ -223,9 +211,9 @@ const HomePage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.5 }}
           >
-            <h3 className="text-royalGold font-primary mb-2">Daily Wisdom</h3>
-            <p className="text-white/80 italic">
-              "The wound is the place where the Light enters you." - Rumi
+            <h3 className="text-royalGold font-primary mb-2 mystic-title">✧ Daily Wisdom ✧</h3>
+            <p className="text-white/80 italic mystic-decorative">
+              "The wound is the place where the Light enters you." <span className="text-royalGoldLight">- Rumi</span>
             </p>
           </motion.div>
           

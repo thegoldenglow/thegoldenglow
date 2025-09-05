@@ -49,7 +49,7 @@ app.post('/api/validate-telegram-auth', async (req, res) => {
     }
 
     // Validate the initData using proper cryptographic verification
-    const validationResult = validateTelegramInitData(initData, botToken);
+    const validationResult = await validateTelegramInitData(initData, botToken);
     
     if (!validationResult.valid) {
       return res.status(401).json({
@@ -73,15 +73,46 @@ app.post('/api/validate-telegram-auth', async (req, res) => {
   }
 });
 
+// Polyfill Web Crypto for Node.js if needed
+import { webcrypto as nodeWebCrypto } from 'crypto';
+if (!globalThis.crypto || !globalThis.crypto.subtle) {
+  globalThis.crypto = nodeWebCrypto;
+}
+
 // Telegram membership verification endpoint
 app.post('/api/verify-telegram-membership', async (req, res) => {
   try {
-    const { userId, chatId, initData } = req.body;
-    
-    if (!userId || !chatId) {
+    const body = req.body || {};
+    let { userId, chatId, initData, chat } = body; // chat may be provided as alternative to chatId
+
+    // Normalize chat input to something Telegram API accepts (@username, numeric id, or extracted from t.me URL)
+    const normalizeChat = (input) => {
+      if (!input) return input;
+      if (typeof input !== 'string') return input;
+      let trimmed = input.trim();
+      // If numeric-like (includes negative for channels), return as-is
+      if (/^-?\d+$/.test(trimmed)) return trimmed;
+      // If it's a t.me URL, extract the path as username
+      try {
+        if (trimmed.startsWith('http')) {
+          const url = new URL(trimmed);
+          const path = url.pathname.replace(/^\//, '');
+          if (path) trimmed = path;
+        }
+      } catch {}
+      // Ensure username starts with '@' (for usernames) and not already a numeric id
+      if (!trimmed.startsWith('@') && !trimmed.startsWith('-')) {
+        trimmed = '@' + trimmed;
+      }
+      return trimmed;
+    };
+
+    const normalizedChatId = normalizeChat(chatId || chat);
+
+    if (!normalizedChatId) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Missing userId or chatId' 
+        error: 'Missing chatId or chat' 
       });
     }
 
@@ -98,13 +129,24 @@ app.post('/api/verify-telegram-membership', async (req, res) => {
 
     // Validate initData if provided (optional for additional security)
     if (initData) {
-      const validationResult = validateTelegramInitData(initData, botToken);
+      const validationResult = await validateTelegramInitData(initData, botToken);
       if (!validationResult.valid) {
         return res.status(401).json({
           success: false,
           error: 'Invalid Telegram authentication'
         });
       }
+      // If userId not explicitly provided, derive it from validated initData
+      if (!userId && validationResult.data?.user?.id) {
+        userId = validationResult.data.user.id;
+      }
+    }
+
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing userId (or initData to derive it)' 
+      });
     }
 
     // Check membership using Telegram Bot API
@@ -115,7 +157,7 @@ app.post('/api/verify-telegram-membership', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        chat_id: chatId,
+        chat_id: normalizedChatId,
         user_id: userId
       })
     });
@@ -124,22 +166,24 @@ app.post('/api/verify-telegram-membership', async (req, res) => {
     
     if (!data.ok) {
       console.error('Telegram API error:', data.description);
-      return res.status(400).json({
+      return res.status(200).json({ // return 200 with success=false so client can still proceed to open link
         success: false,
         error: data.description || 'Failed to check membership',
-        isMember: false
+        isMember: false,
+        status: data.error_code ? `tg_error_${data.error_code}` : 'tg_error'
       });
     }
 
-    // Check if user is a member (member, administrator, creator)
-    const memberStatus = data.result.status;
-    const isMember = ['member', 'administrator', 'creator'].includes(memberStatus);
+    // Check if user is a member (member, administrator, creator) or restricted but still a member
+    const memberStatus = data.result.status; // 'creator','administrator','member','restricted','left','kicked'
+    const isRestrictedMember = memberStatus === 'restricted' && data.result?.is_member !== false;
+    const isMember = ['member', 'administrator', 'creator'].includes(memberStatus) || isRestrictedMember;
     
     return res.status(200).json({
       success: true,
       isMember,
       status: memberStatus,
-      chatId,
+      chatId: normalizedChatId,
       userId
     });
     
@@ -413,85 +457,6 @@ tryPort(initialPort).catch(err => {
 
 // Telegram membership verification endpoint
 app.post('/api/verify-telegram-membership', async (req, res) => {
-  try {
-    const { initData, chat } = req.body; // chat can be '@channelusername', 'https://t.me/...', or numeric id like -1001234567890
-
-    if (!initData || !chat) {
-      return res.status(400).json({ 
-        verified: false, 
-        error: 'Missing initData or chat' 
-      });
-    }
-
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    if (!botToken) {
-      console.error('TELEGRAM_BOT_TOKEN not configured');
-      return res.status(500).json({ verified: false, error: 'Server configuration error' });
-    }
-
-    // Validate Telegram auth first
-    const validationResult = await validateTelegramInitData(initData, botToken);
-    if (!validationResult.valid || !validationResult.data?.user?.id) {
-      return res.status(401).json({ 
-        verified: false, 
-        error: validationResult.error || 'Invalid Telegram auth' 
-      });
-    }
-
-    const userId = validationResult.data.user.id;
-
-    // Normalize chat input to something Telegram API accepts
-    const normalizeChat = (input) => {
-      if (typeof input !== 'string') return input;
-      let trimmed = input.trim();
-      // If numeric-like (includes negative for channels), return as-is
-      if (/^-?\d+$/.test(trimmed)) return trimmed;
-      // If it's a t.me URL, extract the path as username
-      try {
-        if (trimmed.startsWith('http')) {
-          const url = new URL(trimmed);
-          const path = url.pathname.replace(/^\//, '');
-          if (path) trimmed = path;
-        }
-      } catch {}
-      // Ensure username starts with '@'
-      if (!trimmed.startsWith('@') && !trimmed.startsWith('-')) {
-        trimmed = '@' + trimmed;
-      }
-      return trimmed;
-    };
-
-    const chatId = normalizeChat(chat);
-
-    const url = `https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${encodeURIComponent(chatId)}&user_id=${encodeURIComponent(userId)}`;
-    const tgResp = await fetch(url);
-    const tgJson = await tgResp.json().catch(() => null);
-
-    if (!tgResp.ok || !tgJson) {
-      console.error('Telegram getChatMember network error', tgResp.status, tgJson);
-      return res.status(502).json({ verified: false, error: 'Telegram API request failed' });
-    }
-
-    if (!tgJson.ok) {
-      // Common cases: bot not in chat, chat not found, etc.
-      return res.status(200).json({
-        verified: false,
-        error: tgJson.description || 'Unable to verify membership',
-        telegram: { ok: tgJson.ok, error_code: tgJson.error_code, description: tgJson.description }
-      });
-    }
-
-    const member = tgJson.result; // contains status and user details
-    const status = member.status; // 'creator','administrator','member','restricted','left','kicked'
-    const isMember = ['creator', 'administrator', 'member', 'restricted'].includes(status) && !(status === 'restricted' && member.is_member === false);
-
-    return res.status(200).json({
-      verified: isMember,
-      status,
-      member
-    });
-  } catch (err) {
-    console.error('verify-telegram-membership error:', err);
-    return res.status(500).json({ verified: false, error: 'Internal server error' });
-  }
+  // Consolidated into the earlier endpoint definition above to avoid duplicate route handlers.
+  return res.status(410).json({ verified: false, error: 'Endpoint moved: use success/isMember response shape' });
 });

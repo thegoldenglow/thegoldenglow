@@ -160,9 +160,12 @@ const TasksWidget = ({ maxItems = 3, className = '' }) => {
     }
   };
 
-  const handleVerify = (task) => {
+  const handleVerify = async (task) => {
     try {
       if (!task) return;
+
+      // Add a small delay to show loading animation
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const category = getNormalizedCategory(task);
 
@@ -173,6 +176,48 @@ const TasksWidget = ({ maxItems = 3, className = '' }) => {
       }
 
       const webApp = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
+      
+      // For Telegram tasks, try to verify membership first
+      const platformName = (task.platform || '').toLowerCase();
+      if (platformName.includes('telegram') || platformName === 'tg') {
+        const username = task.targetUsername || task.target_username || '';
+        const chatId = username.startsWith('@') ? username : `@${username}`;
+        
+        if (webApp?.initDataUnsafe?.user?.id && username) {
+          try {
+            const response = await fetch('/api/verify-telegram-membership', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                userId: webApp.initDataUnsafe.user.id,
+                chatId: chatId,
+                initData: webApp.initData
+              })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.isMember) {
+              // User is already a member, complete the task
+              console.log('TasksWidget: User is already a member, completing task');
+              if (tasksManager) {
+                await tasksManager.completeTask(task.id);
+              }
+              return;
+            } else if (result.success && !result.isMember) {
+              // User is not a member, open the link for them to join
+              console.log('TasksWidget: User is not a member, opening Telegram link');
+            } else {
+              console.log('TasksWidget: Membership check failed, opening link anyway');
+            }
+          } catch (error) {
+            console.error('TasksWidget: Error checking membership:', error);
+            // Continue to open link if verification fails
+          }
+        }
+      }
 
       // Check for direct link first (highest priority)
       if (task.link && typeof task.link === 'string') {

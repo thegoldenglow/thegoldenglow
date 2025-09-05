@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import Icon from '../atoms/Icon';
+import Button from '../atoms/Button';
 import { formatReward, getTaskRequirement } from '../../utils/taskUtils';
 import EmbeddedPostViewer from './EmbeddedPostViewer';
 import { useTasks } from '../../contexts/TasksContext';
 
 const TaskItem = ({ task, onNavigate, onClaim, onAdBoost, onVerify }) => {
   const [showEmbeddedPost, setShowEmbeddedPost] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const { tasksManager } = useTasks();
   // Calculate progress percentage
   const progressPercentage = task.requirement > 0 
@@ -118,12 +120,24 @@ const TaskItem = ({ task, onNavigate, onClaim, onAdBoost, onVerify }) => {
             >
               {isContentEngagementTask ? 'View Post' : 'Play Now'}
             </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onVerify && onVerify(task); }}
+            <Button
+              onClick={async (e) => { 
+                e.stopPropagation(); 
+                if (onVerify && !isVerifying) {
+                  setIsVerifying(true);
+                  try {
+                    await onVerify(task);
+                  } finally {
+                    // Reset loading state after a short delay to show completion
+                    setTimeout(() => setIsVerifying(false), 1000);
+                  }
+                }
+              }}
+              loading={isVerifying}
               className="px-3 py-2 bg-blue-600/80 text-white rounded hover:bg-blue-600 transition"
             >
               Verify
-            </button>
+            </Button>
           </>
         )}
         {task.completed && !task.claimed && (

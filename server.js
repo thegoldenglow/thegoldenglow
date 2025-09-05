@@ -5,6 +5,10 @@ import http from 'http';
 import { Server } from 'socket.io';
 import { validateTelegramInitData } from './src/utils/telegramValidation.js';
 import fetch from 'node-fetch';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -65,6 +69,86 @@ app.post('/api/validate-telegram-auth', async (req, res) => {
     return res.status(500).json({ 
       valid: false, 
       error: 'Internal server error' 
+    });
+  }
+});
+
+// Telegram membership verification endpoint
+app.post('/api/verify-telegram-membership', async (req, res) => {
+  try {
+    const { userId, chatId, initData } = req.body;
+    
+    if (!userId || !chatId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing userId or chatId' 
+      });
+    }
+
+    // Get bot token from environment variables
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    
+    if (!botToken) {
+      console.error('TELEGRAM_BOT_TOKEN not configured');
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Server configuration error' 
+      });
+    }
+
+    // Validate initData if provided (optional for additional security)
+    if (initData) {
+      const validationResult = validateTelegramInitData(initData, botToken);
+      if (!validationResult.valid) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid Telegram authentication'
+        });
+      }
+    }
+
+    // Check membership using Telegram Bot API
+    const telegramApiUrl = `https://api.telegram.org/bot${botToken}/getChatMember`;
+    const response = await fetch(telegramApiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        user_id: userId
+      })
+    });
+
+    const data = await response.json();
+    
+    if (!data.ok) {
+      console.error('Telegram API error:', data.description);
+      return res.status(400).json({
+        success: false,
+        error: data.description || 'Failed to check membership',
+        isMember: false
+      });
+    }
+
+    // Check if user is a member (member, administrator, creator)
+    const memberStatus = data.result.status;
+    const isMember = ['member', 'administrator', 'creator'].includes(memberStatus);
+    
+    return res.status(200).json({
+      success: true,
+      isMember,
+      status: memberStatus,
+      chatId,
+      userId
+    });
+    
+  } catch (error) {
+    console.error('Membership verification error:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      isMember: false
     });
   }
 });

@@ -1,0 +1,25 @@
+The Netlify deploy errored. The relevant error log line information is:
+
+Line 13: Starting to install dependencies
+Line 14: Started restoring cached python cache
+Line 15: Finished restoring cached python cache
+Line 16: Python version set to 3.13.3
+Line 17: Started restoring cached ruby cache
+Line 18: Finished restoring cached ruby cache
+Line 19: Ruby version set to 3.4.3
+Line 20: Started restoring cached go cache
+Line 21: Finished restoring cached go cache
+Line 22: Go version set to 1.24.3
+Line 23: Failed during stage 'Install dependencies': dependency_installation script returned non-zero exit code: 1
+
+Netlify has analyzed the error and provided the following guidance:
+
+**Diagnosis:**
+The build failed during the stage of installing dependencies due to a non-zero exit code returned by the dependency installation script.
+
+**Solution:**
+To resolve this issue, you should review and fix the dependency installation script. Look into the script that is executed during the dependency installation phase and address any errors or issues causing it to return a non-zero exit code.
+
+If the script dependencies are missing, ensure that all necessary dependencies are correctly specified in the project configuration files and that they are available for installation during the build process.
+
+After making the necessary adjustments to the dependency installation script, trigger a new build to verify that the issue has been resolved.

@@ -1,0 +1,133 @@
+{
+  "project": "The Golden Glow",
+  "summary": "React + Vite app featuring casual games, points/rewards, leaderboards, referrals, an admin panel, Telegram WebApp auth, Supabase backend, and optional wallet/web3 integrations.",
+  "tech_stack": {
+    "frontend": ["React 18", "react-router-dom", "Material UI", "Framer Motion", "Recharts", "Tailwind CSS"],
+    "state_management": ["React Context (ThemeContext, UserContext, GameContext, TasksContext, RewardContext, WalletContext, GameRewardContext)"],
+    "backend_runtime": ["Node.js Express (server.js)", "Socket.IO for multiplayer"],
+    "database": ["Supabase (Postgres, Auth, Storage) via @supabase/supabase-js"],
+    "web3": ["@solana/wallet-adapter-react", "@tonconnect/ui-react", "ethers", "wagmi", "@web3modal/wagmi"],
+    "build_tooling": ["Vite", "ESLint", "PostCSS", "Tailwind"],
+    "deployment": ["Netlify", "Vercel", "Railway", "Render (config files present)"]
+  },
+  "frontend_routes": [
+    { "path": "/", "component": "HomePage" },
+    { "path": "/profile", "component": "ProfilePage" },
+    { "path": "/daily-tasks", "component": "DailyTasksPage" },
+    { "path": "/rewards", "component": "RewardsPage" },
+    { "path": "/referral", "component": "ReferralPage" },
+    { "path": "/leaderboard", "component": "LeaderboardPage" },
+    { "path": "/games/marks-of-destiny", "component": "MarksOfDestiny" },
+    { "path": "/games/marks-of-destiny/multiplayer", "component": "MarksOfDestinyMultiplayer" },
+    { "path": "/games/path-of-enlightenment", "component": "PathOfEnlightenment" },
+    { "path": "/games/flame-of-wisdom", "component": "FlameOfWisdom" },
+    { "path": "/games/sacred-tapping", "component": "SacredTapping" },
+    { "path": "/games/gates-of-knowledge", "component": "GatesOfKnowledge" },
+    { "path": "/games/mystical-tap-journey", "component": "MysticalTapJourney" },
+    { "path": "/games/tic-tac-toe", "component": "TicTacToe" }
+  ],
+  "admin_routes": [
+    { "path": "/admin", "components": ["AdminDashboard"] },
+    { "path": "/admin/users", "components": ["UserManagement"] },
+    { "path": "/admin/tasks", "components": ["TaskManagement"] },
+    { "path": "/admin/ads", "components": ["AdManagement"] },
+    { "path": "/admin/analytics", "components": ["AnalyticsDashboard"] },
+    { "path": "/admin/system", "components": ["SystemSettings"] },
+    { "path": "/admin/questions", "components": ["QuestionManagement"] }
+  ],
+  "key_features": [
+    "Telegram WebApp init and auth (TelegramAuthManager, server validation endpoint)",
+    "Supabase user sync; profiles with points; game scores; referrals",
+    "Points and rewards system (RewardContext, awardGameReward)",
+    "Daily tasks with streaks and rewards",
+    "Leaderboards (general, game-specific, referral)",
+    "Admin panel for users, tasks, ads, analytics, system settings, questions",
+    "Analytics dashboard with Recharts and Supabase metrics",
+    "Multiplayer Marks of Destiny via Socket.IO rooms",
+    "Wallet integrations (Solana, TON, EVM via Wagmi/Web3Modal)"
+  ],
+  "supabase": {
+    "client_init": "src/utils/supabase.js",
+    "schema_files": ["supabase_schema.sql", "supabase/migrations/*.sql"],
+    "tables_views": [
+      "profiles (points)",
+      "game_scores",
+      "task_completions",
+      "ad_clicks",
+      "referrals",
+      "views: points_leaderboard, user_referral_stats"
+    ],
+    "functions_and_migrations": [
+      "sync_telegram_user_function.sql",
+      "fix_telegram_auth.sql and related migration scripts"
+    ]
+  },
+  "telegram": {
+    "client": "src/components/auth/TelegramAuthManager.jsx",
+    "server_validation": "api/validate-telegram-auth.js or server.js /api/validate-telegram-auth",
+    "utils": [
+      "src/utils/telegramValidation.js",
+      "src/utils/telegramBot.js",
+      "src/utils/telegramSync.js",
+      "src/utils/telegramGameProxy.js",
+      "src/utils/telegramTokenManager.js",
+      "src/utils/telegramWebAppLocal.js"
+    ],
+    "docs": [
+      "TELEGRAM_AUTH_SETUP.md",
+      "TELEGRAM_SYNC_SETUP.md",
+      "TELEGRAM_REFERRAL_TEST_REPORT.md"
+    ]
+  },
+  "realtime_and_games": {
+    "socket_server": "server.js (rooms, create/join, makeMove, requestNewGame)",
+    "games": [
+      "FlameOfWisdom",
+      "GatesOfKnowledge",
+      "MarksOfDestiny (single/multi)",
+      "MysticalTapJourney",
+      "PathOfEnlightenment",
+      "SacredTapping",
+      "TicTacToe"
+    ]
+  },
+  "admin": {
+    "data_services": [
+      "src/admin/utils/adminDataService.js",
+      "src/admin/utils/userManager.js",
+      "src/admin/utils/taskOperations.js",
+      "src/admin/utils/supabase.js"
+    ],
+    "analytics": "src/admin/components/analytics/AnalyticsDashboard.jsx"
+  },
+  "leaderboards_rewards_tasks": {
+    "leaderboards": [
+      "src/components/pages/LeaderboardPage.jsx",
+      "src/components/leaderboard/GameLeaderboard.jsx",
+      "src/components/leaderboard/ReferralLeaderboard.jsx",
+      "src/utils/gameScoreManager.js (formatting, aggregation)"
+    ],
+    "rewards": [
+      "src/contexts/RewardContext.jsx (awardGameReward, game-specific configs)",
+      "src/components/rewards/*"
+    ],
+    "tasks": [
+      "src/components/pages/DailyTasksPage.jsx",
+      "src/components/tasks/*",
+      "src/contexts/TasksContext.jsx"
+    ]
+  },
+  "build_and_dev": {
+    "vite": "vite.config.js (multi-entry main/admin, proxy /api -> http://localhost:3001)",
+    "server": "server.js (serves dist, Socket.IO, Telegram auth API)",
+    "scripts": ["npm run dev", "npm run build", "npm run preview", "npm run server", "npm run migrate"]
+  },
+  "deployment_configs": ["netlify.toml", "render.yaml", "railway.json", "Procfile", ".vercel/project.json"],
+  "notable_files": [
+    "MANUAL_DATABASE_FIX.md",
+    "point-system-verification.md",
+    "TELEGRAM_AUTH_SETUP.md",
+    "TELEGRAM_SYNC_SETUP.md",
+    "scripts/* (DB/MCP helpers and diagnostics)"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "name": "supabase-mcp-server",
+  "type": "supabase",
+  "connection": {
+    "url": "https://luzpkuypmyidaluitvzh.supabase.co",
+    "key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1enBrdXlwbXlpZGFsdWl0dnpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY3MDM4NDIsImV4cCI6MjA2MjI3OTg0Mn0.D4am_bzy02Ve5iEETJfSapppTc9g5uD5UTLCv7KqXd0",
+    "options": {
+      "auth": {
+        "autoRefreshToken": true,
+        "persistSession": true,
+        "detectSessionInUrl": true
+      },
+      "realtime": {
+        "params": {
+          "eventsPerSecond": 10
+        }
+      },
+      "db": {
+        "schema": "public"
+      }
+    }
+  },
+  "tables": [
+    "profiles",
+    "analytics_users",
+    "analytics_games",
+    "tasks",
+    "task_completions"
+  ],
+  "enabled": true
+}

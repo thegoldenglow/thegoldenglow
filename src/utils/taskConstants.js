@@ -1,0 +1,17 @@
+// Centralized task-related enums to avoid circular dependencies
+
+export const TaskType = {
+  DAILY_LOGIN: 'DAILY_LOGIN',
+  GAME_SPECIFIC: 'GAME_SPECIFIC',
+  CROSS_GAME: 'CROSS_GAME',
+  ACHIEVEMENT: 'ACHIEVEMENT',
+  SOCIAL: 'SOCIAL',
+  SPECIAL_CHALLENGE: 'SPECIAL_CHALLENGE'
+};
+
+export const RewardType = {
+  MYSTIC_COINS: 'MYSTIC_COINS',
+  MYSTICAL_ESSENCE: 'MYSTICAL_ESSENCE',
+  WISDOM_SCROLL: 'WISDOM_SCROLL',
+  ITEM: 'ITEM'
+};

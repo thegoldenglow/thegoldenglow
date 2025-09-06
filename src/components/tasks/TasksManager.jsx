@@ -223,6 +223,42 @@ export class TasksManager {
     return this.updateTaskProgress(taskId, Infinity); // Set progress to max to complete the task
   }
 
+  // Verify task completion status from server and update local state if completed
+  async verifyTaskFromServer(taskId) {
+    if (!isSupabaseAvailable()) return false;
+    try {
+      const task = this.taskList.find(t => t.id === taskId);
+      const numericId = (() => { try { return parseInt(taskId, 10); } catch (_) { return null; } })();
+      if (numericId == null) return false;
+
+      const map = await this.progressService.loadProgressMap([taskId]);
+      const row = map[numericId];
+      if (!row) return false;
+
+      const requirement = (task?.requirement != null ? task.requirement : (row.requirement != null ? row.requirement : 1));
+      const isCompleted = !!row.completed || (parseInt(row.progress || 0, 10) >= parseInt(requirement || 1, 10));
+
+      if (isCompleted) {
+        // Ensure local state reflects completion
+        await this.updateTaskProgress(taskId, requirement);
+        // Optionally mirror claimed flag locally if present
+        if (row.claimed && task && !task.claimed) {
+          task.claimed = true;
+          this.storageManager.saveData('gg_tasks', {
+            tasks: this.taskList,
+            lastRefreshDate: this.storageManager.loadData('gg_tasks')?.lastRefreshDate || new Date().toISOString()
+          });
+          this.dispatch({ type: 'TASKS_REFRESHED', payload: { tasks: this.taskList } });
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.warn('verifyTaskFromServer error:', e?.message || e);
+      return false;
+    }
+  }
+
   /**
    * Complete an embedded post viewing task with specific validation
    * @param {string} taskId - The task ID

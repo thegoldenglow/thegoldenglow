@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-05-22T01:11:15.136Z",
+  "timestamp": "2025-09-06T21:25:36.372Z",
   "success": true,
   "connectionTest": true,
   "registrationTest": true,
-  "tablesAccessible": false,
+  "tablesAccessible": true,
   "url": "https://luzpkuypmyidaluitvzh.supabase.co"
 }

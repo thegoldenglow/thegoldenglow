@@ -9,7 +9,7 @@ import DebugSupabase from '../debug/DebugSupabase';
 import { getNextMilestone, getTimeUntilExpiration } from '../../utils/taskUtils';
 
 const DailyTasksPage = () => {
-  const { state, tasksManager } = useTasks();
+  const { state, tasksManager, verifyTask } = useTasks();
   const [timeUntilReset, setTimeUntilReset] = useState('');
   const [showAdModal, setShowAdModal] = useState(false);
   const [currentTaskForAd, setCurrentTaskForAd] = useState(null);

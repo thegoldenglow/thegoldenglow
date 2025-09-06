@@ -2,11 +2,12 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTasks } from '../../contexts/TasksContext';
 import TaskList from './TaskList';
+import { toast } from 'react-hot-toast';
 
 // Lightweight embeddable tasks widget that can be dropped inside any div
 // Assumes TasksProvider is mounted at app root (it is, in App.jsx)
 const TasksWidget = ({ maxItems = 3, className = '' }) => {
-  const { state, tasksManager } = useTasks();
+  const { state, tasksManager, verifyTask } = useTasks();
   const navigate = useNavigate();
 
   const normalizeTargetGameSlug = (id) => {
@@ -290,6 +291,7 @@ const TasksWidget = ({ maxItems = 3, className = '' }) => {
       navigate('/daily-tasks');
     } catch (e) {
       console.error('TasksWidget: verify error', e);
+      toast.error('Verification failed. Please try again shortly.');
     }
   };
 

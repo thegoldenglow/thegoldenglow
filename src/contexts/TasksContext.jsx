@@ -319,7 +319,23 @@ export const TasksProvider = ({ children }) => {
   const contextValue = {
     state,
     dispatch,
-    tasksManager
+    // Verify a task by checking server progress, then optionally refresh tasks
+    verifyTask: async (taskId) => {
+      try {
+        const ok = await tasksManager.verifyTaskFromServer(taskId);
+        if (ok) {
+          // Hydrate again to ensure latest claimed/completed flags propagate
+          await tasksManager.refreshDailyTasks();
+        }
+        return ok;
+      } catch (e) {
+        return false;
+      }
+    },
+    // Existing APIs
+    updateTaskProgress: (taskId, progress) => tasksManager.updateTaskProgress(taskId, progress),
+    claimTaskReward: (taskId, withAdBoost = false) => tasksManager.claimTaskReward(taskId, withAdBoost),
+    completeEmbeddedPostTask: (taskId, viewingTime, requiredTime) => tasksManager.completeEmbeddedPostTask(taskId, viewingTime, requiredTime),
   };
 
   return (

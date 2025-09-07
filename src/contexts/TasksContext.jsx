@@ -319,6 +319,7 @@ export const TasksProvider = ({ children }) => {
   const contextValue = {
     state,
     dispatch,
+    tasksManager,
     // Verify a task by checking server progress, then optionally refresh tasks
     verifyTask: async (taskId) => {
       try {

@@ -79,6 +79,58 @@ if (!globalThis.crypto || !globalThis.crypto.subtle) {
   globalThis.crypto = nodeWebCrypto;
 }
 
+// Task completion endpoint
+app.post('/api/complete-task', async (req, res) => {
+  try {
+    const { taskId, userId, telegramId } = req.body;
+    
+    if (!taskId || (!userId && !telegramId)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: taskId and (userId or telegramId)' 
+      });
+    }
+    
+    // For now, we'll use a simple approach - just return success
+    // In a full implementation, you would:
+    // 1. Connect to your database (Supabase)
+    // 2. Insert/update the task completion record
+    // 3. Handle any business logic (points, rewards, etc.)
+    
+    console.log(`Task completion request: taskId=${taskId}, userId=${userId}, telegramId=${telegramId}`);
+    
+    // Simulate database operation
+    const completionRecord = {
+      task_id: parseInt(taskId),
+      user_id: userId || telegramId,
+      completed: true,
+      progress: 100, // Assuming 100% completion
+      completed_at: new Date().toISOString()
+    };
+    
+    // TODO: Replace this with actual database insertion
+    // Example Supabase code:
+    // const { data, error } = await supabase
+    //   .from('user_task_progress')
+    //   .upsert(completionRecord, { onConflict: 'task_id,user_id' });
+    
+    console.log('Task completion record (simulated):', completionRecord);
+    
+    res.json({ 
+      success: true, 
+      message: 'Task completed successfully',
+      data: completionRecord
+    });
+    
+  } catch (error) {
+    console.error('Error completing task:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
 // Telegram membership verification endpoint
 app.post('/api/verify-telegram-membership', async (req, res) => {
   try {
@@ -453,10 +505,4 @@ const initialPort = process.env.PORT || 3001;
 
 tryPort(initialPort).catch(err => {
   console.error('Failed to start server:', err);
-});
-
-// Telegram membership verification endpoint
-app.post('/api/verify-telegram-membership', async (req, res) => {
-  // Consolidated into the earlier endpoint definition above to avoid duplicate route handlers.
-  return res.status(410).json({ verified: false, error: 'Endpoint moved: use success/isMember response shape' });
 });

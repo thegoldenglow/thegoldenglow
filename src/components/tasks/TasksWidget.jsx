@@ -162,139 +162,128 @@ const TasksWidget = ({ maxItems = 3, className = '' }) => {
   };
 
   const handleVerify = async (task) => {
+    if (!task) return;
+
+    setVerifyingTasks(prev => ({ ...prev, [task.id]: true }));
+    
     try {
-      if (!task) return;
-
-      // Add a small delay to show loading animation
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const category = getNormalizedCategory(task);
-
-      // Referral tasks use our in-app referral flow. Social follow should open the provided link.
-      if (category === 'referral') {
-        navigate('/referral');
-        return;
-      }
-
-      const webApp = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
-      const platformName = (task.platform || '').toLowerCase();
-      const isTelegramTask = platformName.includes('telegram') || platformName === 'tg' || /t\.me\//i.test(task.link || '') || /t\.me\//i.test((task.verifyUrl || task.verify_url || ''));
-
-      // Prefer any available chat identifier for verification
-      const chatCandidateRaw = task.chat || task.verifyChat || task.targetUsername || task.target_username || task.link || '';
-      const chatCandidate = chatCandidateRaw; // Let the server normalize (@username, numeric id, or t.me link)
-
-      // For Telegram tasks, try to verify membership first
+      // Determine if this is a Telegram task
+      const isTelegramTask = task.platform?.toLowerCase().includes('telegram') || 
+                            task.link?.includes('t.me') ||
+                            task.verifyUrl?.includes('t.me');
+      
       if (isTelegramTask) {
-        if (webApp?.initDataUnsafe?.user?.id && chatCandidate) {
+        // For Telegram tasks, verify membership first
+        const userId = user?.telegram_id || user?.id;
+        if (!userId) {
+          console.error('No user ID available for Telegram verification');
+          return;
+        }
+        
+        // Get chat identifier - try multiple sources
+        let chatCandidate = task.chat || task.verifyChat || task.targetUsername || task.target_username;
+        
+        // If no direct chat identifier, try to extract from link
+        if (!chatCandidate && task.link) {
+          const linkMatch = task.link.match(/t\.me\/([^/?]+)/);
+          if (linkMatch) {
+            chatCandidate = linkMatch[1];
+          }
+        }
+        
+        if (chatCandidate) {
           try {
             const response = await fetch('/api/verify-telegram-membership', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                userId: webApp.initDataUnsafe.user.id,
-                chatId: chatCandidate,
+                userId: userId.toString(),
                 chat: chatCandidate,
-                initData: webApp.initData
+                initData: window.Telegram?.WebApp?.initData || ''
               })
             });
-
+            
             const result = await response.json();
-
+            console.log('Telegram verification result:', result);
+            
             if (result.success && result.isMember) {
-              // User is already a member, complete the task
-              console.log('TasksWidget: User is already a member, completing task');
-              if (tasksManager) {
-                await tasksManager.completeTask(task.id);
-              }
+              // User is a member, complete the task
+              console.log('User verified as member, completing task');
+              
+              // Force complete the task locally and try to sync to server
+              await forceCompleteTask(task.id);
               return;
-            } else if (result.success && !result.isMember) {
-              // User is not a member, open the link for them to join
-              console.log('TasksWidget: User is not a member, opening Telegram link');
             } else {
-              console.log('TasksWidget: Membership check failed, opening link anyway');
+              console.log('User not verified as member:', result.error || 'Not a member');
             }
           } catch (error) {
-            console.error('TasksWidget: Error checking membership:', error);
-            // Continue to open link if verification fails
+            console.error('Error verifying Telegram membership:', error);
           }
         }
       }
-
-      // Check for direct link first (highest priority)
-      if (task.link && typeof task.link === 'string') {
-        if ((task.link.startsWith('https://t.me/') || task.link.startsWith('t.me/')) && typeof webApp?.openTelegramLink === 'function') {
-          console.log(`TasksWidget: Opening Telegram link for verification: ${task.link}`);
-          webApp.openTelegramLink(task.link);
-        } else if (typeof webApp?.openLink === 'function') {
-          console.log(`TasksWidget: Using Telegram WebApp openLink for verification: ${task.link}`);
-          webApp.openLink(task.link);
-        } else if (typeof window !== 'undefined' && window.open) {
-          console.log(`TasksWidget: Opening link in new window for verification: ${task.link}`);
-          window.open(task.link, '_blank');
-        }
-        return;
-      }
-
-      // Prefer explicit verifyUrl if provided
-      const verifyUrl = task.verifyUrl || task.verify_url;
-      if (verifyUrl && typeof verifyUrl === 'string') {
-        if ((verifyUrl.startsWith('https://t.me/') || verifyUrl.startsWith('t.me/')) && typeof webApp?.openTelegramLink === 'function') {
-          webApp.openTelegramLink(verifyUrl);
-        } else if (typeof webApp?.openLink === 'function') {
-          webApp.openLink(verifyUrl);
-        } else if (typeof window !== 'undefined' && window.open) {
-          window.open(verifyUrl, '_blank');
-        }
-        return;
-      }
-
-      // Build URL from platform + target username if available
-      const platform = (task.platform || '').toLowerCase();
-      const username = task.targetUsername || task.target_username || '';
-
-      if (platform && username) {
-        let url = '';
-        if (platform.includes('telegram') || platform === 'tg') {
-          url = `https://t.me/${username.replace(/^@/, '')}`;
-          if (typeof webApp?.openTelegramLink === 'function') {
-            webApp.openTelegramLink(url);
-          } else if (typeof webApp?.openLink === 'function') {
-            webApp.openLink(url);
-          } else if (typeof window !== 'undefined' && window.open) {
-            window.open(url, '_blank');
-          }
-          return;
-        }
-
-        if (platform.includes('twitter') || platform === 'x') {
-          url = `https://twitter.com/${username.replace(/^@/, '')}`;
-        } else if (platform.includes('discord')) {
-          // For Discord, username may not be resolvable via URL; prefer invite/verifyUrl when possible
-          url = `https://discord.com/${username}`;
-        } else if (platform.includes('instagram') || platform.includes('ig')) {
-          url = `https://instagram.com/${username.replace(/^@/, '')}`;
-        } else if (platform.includes('facebook') || platform.includes('fb')) {
-          url = `https://facebook.com/${username.replace(/^@/, '')}`;
-        }
-
+      
+      // Open the task link for manual verification
+      if (task.link) {
+        window.open(task.link, '_blank');
+      } else if (task.verifyUrl) {
+        window.open(task.verifyUrl, '_blank');
+      } else if (task.platform && task.targetUsername) {
+        const platformUrls = {
+          telegram: `https://t.me/${task.targetUsername}`,
+          twitter: `https://twitter.com/${task.targetUsername}`,
+          youtube: `https://youtube.com/@${task.targetUsername}`,
+          instagram: `https://instagram.com/${task.targetUsername}`
+        };
+        const url = platformUrls[task.platform.toLowerCase()];
         if (url) {
-          if (typeof webApp?.openLink === 'function') {
-            webApp.openLink(url);
-          } else if (typeof window !== 'undefined' && window.open) {
-            window.open(url, '_blank');
-          }
-          return;
+          window.open(url, '_blank');
         }
       }
-
-      // Fallback to tasks page
-      navigate('/daily-tasks');
-    } catch (e) {
-      console.error('TasksWidget: verify error', e);
-      toast.error('Verification failed. Please try again shortly.');
+      
+      // For non-Telegram tasks or when verification fails, 
+      // still allow manual completion after opening link
+      setTimeout(async () => {
+        await forceCompleteTask(task.id);
+      }, 2000); // Give user 2 seconds to see the opened link
+      
+    } catch (error) {
+      console.error('Error in handleVerify:', error);
+    } finally {
+      setVerifyingTasks(prev => ({ ...prev, [task.id]: false }));
+    }
+  };
+  
+  // Helper function to force complete a task both locally and on server
+  const forceCompleteTask = async (taskId) => {
+    try {
+      // Complete locally first
+      await tasksManager.completeTask(taskId);
+      
+      // Try to sync to server if user is authenticated
+      if (user?.id) {
+        try {
+          // Direct API call to ensure server persistence
+          const response = await fetch('/api/complete-task', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              taskId: taskId,
+              userId: user.id,
+              telegramId: user.telegram_id
+            })
+          });
+          
+          if (response.ok) {
+            console.log('Task completion synced to server');
+          } else {
+            console.warn('Failed to sync task completion to server');
+          }
+        } catch (syncError) {
+          console.warn('Error syncing task completion to server:', syncError);
+        }
+      }
+    } catch (error) {
+      console.error('Error force completing task:', error);
     }
   };
 

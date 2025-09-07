@@ -45,9 +45,11 @@ export class TasksManager {
           const localTaskData = this.storageManager.loadData('gg_tasks');
           if (localTaskData && localTaskData.tasks && localTaskData.tasks.length > 0) {
             console.log('Using tasks from Supabase sync:', localTaskData.tasks.length);
+            console.log('Task states before hydration:', localTaskData.tasks.map(t => ({ id: t.id, completed: t.completed, claimed: t.claimed })));
             this.taskList = localTaskData.tasks;
             this.dispatch({ type: 'TASKS_LOADED', payload: localTaskData.tasks });
             await this._hydrateProgressFromServer();
+            console.log('Task states after hydration:', this.taskList.map(t => ({ id: t.id, completed: t.completed, claimed: t.claimed })));
             return;
           }
         } catch (syncError) {
@@ -63,31 +65,46 @@ export class TasksManager {
           const parsedTasks = JSON.parse(emergencyTasks);
           console.log('Using emergency tasks from cache:', parsedTasks.length);
           
-          // Convert to the expected format
-          const formattedTasks = parsedTasks.map(task => ({
-            id: task.id.toString(),
-            title: task.title || 'Task',
-            description: task.description || 'Complete this task to earn rewards',
-            type: task.type || 'DAILY_LOGIN', 
-            // Use multiple fallbacks so navigation has a valid slug
-            targetGame: task.target_game || task.targetGame || task.game_identifier || null,
-            // Preserve raw identifier for components that rely on it
-            game_identifier: task.game_identifier || task.gameIdentifier || '',
-            // Include the link field for task navigation
-            link: task.link || null,
-            requirement: parseInt(task.requirement || 1, 10),
-            progress: parseInt(task.progress || 0, 10),
-            completed: task.completed === true,
-            claimed: task.claimed === true,
-            adBoostAvailable: task.ad_boost_available !== false,
-            expiresAt: task.expires_at || new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
-            rewards: [
-              {
-                type: 'MYSTIC_COINS',
-                amount: parseFloat(task.reward) || 10
-              }
-            ]
-          }));
+          // Check if we have existing local task data to preserve states
+          const existingTaskData = this.storageManager.loadData('gg_tasks');
+          const existingTasksMap = new Map();
+          if (existingTaskData && existingTaskData.tasks) {
+            existingTaskData.tasks.forEach(task => {
+              existingTasksMap.set(task.id.toString(), task);
+            });
+          }
+          
+          // Convert to the expected format, preserving local states
+          const formattedTasks = parsedTasks.map(task => {
+            const taskId = task.id.toString();
+            const existingTask = existingTasksMap.get(taskId);
+            
+            return {
+              id: taskId,
+              title: task.title || 'Task',
+              description: task.description || 'Complete this task to earn rewards',
+              type: task.type || 'DAILY_LOGIN', 
+              // Use multiple fallbacks so navigation has a valid slug
+              targetGame: task.target_game || task.targetGame || task.game_identifier || null,
+              // Preserve raw identifier for components that rely on it
+              game_identifier: task.game_identifier || task.gameIdentifier || '',
+              // Include the link field for task navigation
+              link: task.link || null,
+              requirement: parseInt(task.requirement || 1, 10),
+              // Preserve local progress and states if they exist
+              progress: existingTask ? existingTask.progress : parseInt(task.progress || 0, 10),
+              completed: existingTask ? existingTask.completed : (task.completed === true),
+              claimed: existingTask ? existingTask.claimed : (task.claimed === true),
+              adBoostAvailable: existingTask ? existingTask.adBoostAvailable : (task.ad_boost_available !== false),
+              expiresAt: task.expires_at || new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+              rewards: [
+                {
+                  type: 'MYSTIC_COINS',
+                  amount: parseFloat(task.reward) || 10
+                }
+              ]
+            };
+          });
           
           this.taskList = formattedTasks;
           this.dispatch({ type: 'TASKS_LOADED', payload: formattedTasks });
@@ -528,7 +545,9 @@ export class TasksManager {
         if (row) {
           const newProgress = typeof row.progress === 'number' ? row.progress : (t.progress || 0);
           const newCompleted = row.completed || (newProgress >= (t.requirement || 1));
-          const newClaimed = row.claimed || t.claimed;
+          // Preserve local claimed state - don't overwrite with server data
+          // This ensures that recently claimed rewards persist across page refreshes
+          const newClaimed = t.claimed || row.claimed;
           if (newProgress !== t.progress || newCompleted !== t.completed || newClaimed !== t.claimed) {
             t.progress = newProgress;
             t.completed = newCompleted;

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTasks } from '../../contexts/TasksContext';
+import { useUser } from '../../contexts/UserContext';
 import TaskList from '../tasks/TaskList';
 import StreakCalendar from '../tasks/StreakCalendar';
 import RewardDisplay from '../tasks/RewardDisplay';
@@ -10,6 +11,7 @@ import { getNextMilestone, getTimeUntilExpiration } from '../../utils/taskUtils'
 
 const DailyTasksPage = () => {
   const { state, tasksManager, verifyTask } = useTasks();
+  const { user, isAuthenticated } = useUser();
   const [timeUntilReset, setTimeUntilReset] = useState('');
   const [showAdModal, setShowAdModal] = useState(false);
   const [currentTaskForAd, setCurrentTaskForAd] = useState(null);
@@ -232,9 +234,26 @@ const DailyTasksPage = () => {
       
       if (isTelegramTask) {
         // For Telegram tasks, verify membership first
-        const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+        // Try to get user ID from multiple sources
+        let userId = null;
+        
+        // First try from UserContext (authenticated user)
+        if (user && user.telegram_id) {
+          userId = user.telegram_id;
+        } else if (user && user.id) {
+          // Fallback to user.id if telegram_id is not available
+          userId = user.id;
+        } else {
+          // Last resort: try Telegram WebApp
+          userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+        }
+        
         if (!userId) {
-          console.error('No user ID available for Telegram verification');
+          console.error('No user ID available for Telegram verification. User must be authenticated.');
+          // Show user-friendly message
+          alert('Please log in to verify Telegram tasks. You need to be authenticated to complete this verification.');
+          // Optionally redirect to profile/login page
+          navigate('/profile');
           return;
         }
         

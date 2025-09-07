@@ -177,14 +177,16 @@ const TasksWidget = ({ maxItems = 3, className = '' }) => {
       }
 
       const webApp = typeof window !== 'undefined' ? window.Telegram?.WebApp : undefined;
-      
-      // For Telegram tasks, try to verify membership first
       const platformName = (task.platform || '').toLowerCase();
-      if (platformName.includes('telegram') || platformName === 'tg') {
-        const username = task.targetUsername || task.target_username || '';
-        const chatId = username.startsWith('@') ? username : `@${username}`;
-        
-        if (webApp?.initDataUnsafe?.user?.id && username) {
+      const isTelegramTask = platformName.includes('telegram') || platformName === 'tg' || /t\.me\//i.test(task.link || '') || /t\.me\//i.test((task.verifyUrl || task.verify_url || ''));
+
+      // Prefer any available chat identifier for verification
+      const chatCandidateRaw = task.chat || task.verifyChat || task.targetUsername || task.target_username || task.link || '';
+      const chatCandidate = chatCandidateRaw; // Let the server normalize (@username, numeric id, or t.me link)
+
+      // For Telegram tasks, try to verify membership first
+      if (isTelegramTask) {
+        if (webApp?.initDataUnsafe?.user?.id && chatCandidate) {
           try {
             const response = await fetch('/api/verify-telegram-membership', {
               method: 'POST',
@@ -193,13 +195,14 @@ const TasksWidget = ({ maxItems = 3, className = '' }) => {
               },
               body: JSON.stringify({
                 userId: webApp.initDataUnsafe.user.id,
-                chatId: chatId,
+                chatId: chatCandidate,
+                chat: chatCandidate,
                 initData: webApp.initData
               })
             });
-            
+
             const result = await response.json();
-            
+
             if (result.success && result.isMember) {
               // User is already a member, complete the task
               console.log('TasksWidget: User is already a member, completing task');

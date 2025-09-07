@@ -114,12 +114,13 @@ const TaskItem = ({ task, onNavigate, onClaim, onAdBoost, onVerify }) => {
       <div className="flex gap-2">
         {!task.completed && (
           <>
-            <button
+            <Button
               onClick={handlePlayNowClick}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors"
+              variant="primary"
+              size="medium"
             >
               {isContentEngagementTask ? 'View Post' : 'Play Now'}
-            </button>
+            </Button>
             <Button
               onClick={async (e) => { 
                 e.stopPropagation(); 
@@ -142,19 +143,21 @@ const TaskItem = ({ task, onNavigate, onClaim, onAdBoost, onVerify }) => {
         )}
         {task.completed && !task.claimed && (
           <>
-            <button
+            <Button
               onClick={(e) => { e.stopPropagation(); onClaim && onClaim(task.id); }}
-              className="px-3 py-2 bg-emerald-600/80 text-white rounded hover:bg-emerald-600 transition"
+              variant="success"
+              size="medium"
             >
               Claim Reward
-            </button>
+            </Button>
             {task.adBoostAvailable && onAdBoost && (
-              <button
+              <Button
                 onClick={(e) => { e.stopPropagation(); onAdBoost && onAdBoost(task); }}
-                className="px-3 py-2 bg-indigo-600/80 text-white rounded hover:bg-indigo-600 transition"
+                variant="secondary"
+                size="medium"
               >
                 Watch Ad
-              </button>
+              </Button>
             )}
           </>
         )}

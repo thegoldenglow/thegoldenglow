@@ -8,6 +8,7 @@ import RewardDisplay from '../tasks/RewardDisplay';
 import AdRewardModal from '../tasks/AdRewardModal';
 import DebugSupabase from '../debug/DebugSupabase';
 import { getNextMilestone, getTimeUntilExpiration } from '../../utils/taskUtils';
+import AdsWidget from '../ads/AdsWidget';
 
 const DailyTasksPage = () => {
   const { state, tasksManager, verifyTask } = useTasks();
@@ -429,6 +430,9 @@ const DailyTasksPage = () => {
               <h3 className="text-lg font-primary text-textGold mb-2">Streak</h3>
               <p className="text-textLight">You've completed {state.streak?.consecutiveDays || 0} days in a row!</p>
               <p className="text-textLight/80 text-sm mt-2">Keep going to achieve higher rewards.</p>
+            </div>
+            <div className="mt-6">
+              <AdsWidget />
             </div>
           </div>
         </div>

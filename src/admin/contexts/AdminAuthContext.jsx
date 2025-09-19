@@ -22,15 +22,15 @@ export const AdminAuthProvider = ({ children }) => {
             const { data: userData, error } = await supabase
               .from('profiles')
               .select('*')
-              .eq('id', session.user.id)
+              .eq('user_id', session.user.id)
               .single();
             
-            if (userData && (userData.role === 'admin' || userData.role === 'superadmin')) {
+            if (userData && (userData.user_type === 'admin' || userData.user_type === 'superadmin')) {
               setAdminUser({
                 id: userData.id,
                 name: userData.name || session.user.email,
                 email: session.user.email,
-                role: userData.role
+                role: userData.user_type
               });
               setIsAuthenticated(true);
               return;
@@ -72,12 +72,12 @@ export const AdminAuthProvider = ({ children }) => {
               .eq('id', session.user.id)
               .single();
               
-            if (userData && (userData.role === 'admin' || userData.role === 'superadmin')) {
+            if (userData && (userData.user_type === 'admin' || userData.user_type === 'superadmin')) {
               setAdminUser({
                 id: userData.id,
                 name: userData.name || session.user.email,
                 email: session.user.email,
-                role: userData.role
+                role: userData.user_type
               });
               setIsAuthenticated(true);
             }
@@ -110,17 +110,17 @@ export const AdminAuthProvider = ({ children }) => {
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', data.user.id)
+          .eq('user_id', data.user.id)
           .single();
           
         if (profileError) throw profileError;
         
-        if (profileData && (profileData.role === 'admin' || profileData.role === 'superadmin')) {
+        if (profileData && (profileData.user_type === 'admin' || profileData.user_type === 'superadmin')) {
           setAdminUser({
             id: profileData.id,
             name: profileData.name || data.user.email,
             email: data.user.email,
-            role: profileData.role
+            role: profileData.user_type
           });
           setIsAuthenticated(true);
           return true;

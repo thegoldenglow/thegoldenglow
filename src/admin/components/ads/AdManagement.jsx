@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 const AdManagement = () => {
+  const { adminUser, isAuthenticated } = useAdminAuth();
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -26,10 +28,13 @@ const AdManagement = () => {
     end_date: '',
     status: 'Draft', // Default status
     goal: '',
+    direct_link: '', // Direct link for ads to appear in game
   };
   const [campaignFormData, setCampaignFormData] = useState(initialCampaignFormData);
   const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
   const [modalError, setModalError] = useState(null);
+  const [editingCampaign, setEditingCampaign] = useState(null);
+  const [isDeletingCampaign, setIsDeletingCampaign] = useState(null);
 
   // Helper function to format numbers with commas
   const formatNumber = (num) => {
@@ -64,12 +69,86 @@ const AdManagement = () => {
     }
   };
 
-  // Fetch campaigns and stats from Supabase
+  // Demo campaign data
+  const demoCampaigns = [
+    {
+      id: 'demo-1',
+      name: 'Summer Wellness',
+      description: 'Promoting summer wellness activities and premium features',
+      status: 'Active',
+      target: 'All Users',
+      start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      impressions: 8500,
+      clicks: 340,
+      ctr: 4.0,
+      direct_link: 'https://example.com/summer-wellness-promo'
+    },
+    {
+      id: 'demo-2',
+      name: 'Premium Membership Promo',
+      description: 'Special discount on premium membership upgrades',
+      status: 'Active',
+      target: 'Free Users',
+      start_date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      impressions: 5200,
+      clicks: 156,
+      ctr: 3.0,
+      direct_link: 'https://example.com/premium-upgrade-50off'
+    },
+    {
+      id: 'demo-3',
+      name: 'New Features Announcement',
+      description: 'Announcing new meditation and tracking features',
+      status: 'Scheduled',
+      target: 'All Users',
+      start_date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+      created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      impressions: 0,
+      clicks: 0,
+      ctr: 0,
+      direct_link: 'https://example.com/new-features-beta'
+    }
+  ];
+
+  // Fetch campaigns and stats from Supabase or use demo data
   const fetchCampaignsAndStats = async () => {
     setLoading(true);
     setError(null);
     
     try {
+      // Check if we're in demo mode
+      const storedAdmin = localStorage.getItem('adminUser');
+      const isDemoMode = storedAdmin && !adminUser?.id?.startsWith('auth_');
+      
+      if (isDemoMode) {
+        // Use demo data, but filter out deleted campaigns
+        console.log('Demo mode: Using demo campaign data');
+        
+        // Get deleted campaign IDs from localStorage
+        const deletedCampaigns = JSON.parse(localStorage.getItem('deletedDemoCampaigns') || '[]');
+        const filteredDemoCampaigns = demoCampaigns.filter(campaign => 
+          !deletedCampaigns.includes(campaign.id)
+        );
+        
+        setTotalCampaigns(filteredDemoCampaigns.length);
+        
+        // Calculate range for pagination
+        const from = (currentPage - 1) * campaignsPerPage;
+        const to = from + campaignsPerPage;
+        
+        const paginatedCampaigns = filteredDemoCampaigns.slice(from, to);
+        setCampaigns(paginatedCampaigns);
+        
+        setLoading(false);
+        return;
+      }
+      
+      // Production mode: Use Supabase
       // Get total count
       const { count, error: countError } = await supabase
         .from('ad_campaigns')
@@ -155,12 +234,102 @@ const AdManagement = () => {
   const handleOpenCampaignModal = () => {
     setCampaignFormData(initialCampaignFormData);
     setModalError(null);
+    setEditingCampaign(null);
     setIsCampaignModalOpen(true);
+  };
+
+  const handleEditCampaign = (campaign) => {
+     console.log('Edit button clicked for campaign:', campaign);
+     setCampaignFormData({
+       name: campaign.name || '',
+       type: campaign.type || 'Display',
+       target_audience: campaign.target_audience || campaign.target || '',
+       budget: campaign.budget ? campaign.budget.toString() : '',
+       start_date: campaign.start_date ? new Date(campaign.start_date).toISOString().split('T')[0] : '',
+       end_date: campaign.end_date ? new Date(campaign.end_date).toISOString().split('T')[0] : '',
+       status: campaign.status || 'Draft',
+       goal: campaign.goal || '',
+     });
+     setEditingCampaign(campaign);
+     setModalError(null);
+     setIsCampaignModalOpen(true);
+   };
+
+  const handleDeleteCampaign = async (campaignId) => {
+    console.log('Delete button clicked for campaign ID:', campaignId);
+    
+    // Check if user is authenticated
+    if (!isAuthenticated || !adminUser) {
+      setError('You must be authenticated to delete campaigns. Please log in again.');
+      return;
+    }
+    
+    if (!window.confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
+      return;
+    }
+
+    setIsDeletingCampaign(campaignId);
+    
+    try {
+      // Check if we're in demo mode (localStorage-based auth)
+      const storedAdmin = localStorage.getItem('adminUser');
+      const isDemoMode = storedAdmin && !adminUser.id?.startsWith('auth_');
+      
+      if (isDemoMode) {
+        // Demo mode: Store deleted campaign ID in localStorage
+        console.log('Demo mode: Storing deleted campaign ID in localStorage');
+        
+        const deletedCampaigns = JSON.parse(localStorage.getItem('deletedDemoCampaigns') || '[]');
+        if (!deletedCampaigns.includes(campaignId)) {
+          deletedCampaigns.push(campaignId);
+          localStorage.setItem('deletedDemoCampaigns', JSON.stringify(deletedCampaigns));
+        }
+        
+        // Refresh the campaigns list to reflect the deletion
+        fetchCampaignsAndStats();
+        console.log('Campaign deleted successfully (demo mode)');
+        return;
+      }
+      
+      // Production mode: Use Supabase
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Authentication session expired. Please log in again.');
+      }
+      
+      if (!session) {
+        throw new Error('No active session found. Please log in again.');
+      }
+      
+      console.log('Authenticated user attempting delete:', session.user.email);
+      
+      const { error } = await supabase
+        .from('ad_campaigns')
+        .delete()
+        .eq('id', campaignId);
+
+      if (error) {
+        console.error('Supabase delete error:', error);
+        throw error;
+      }
+
+      console.log('Campaign deleted successfully:', campaignId);
+      // Refresh the campaigns list
+      fetchCampaignsAndStats();
+    } catch (err) {
+      console.error('Error deleting campaign:', err);
+      setError(`Failed to delete campaign: ${err.message}`);
+    } finally {
+      setIsDeletingCampaign(null);
+    }
   };
 
   const handleCloseCampaignModal = () => {
     setIsCampaignModalOpen(false);
-    setModalError(null); // Clear modal error when closing
+    setModalError(null);
+    setEditingCampaign(null);
   };
 
   const handleCampaignInputChange = (e) => {
@@ -172,6 +341,13 @@ const AdManagement = () => {
     e.preventDefault();
     setModalError(null);
     setIsSubmittingCampaign(true);
+
+    // Check if user is authenticated
+    if (!isAuthenticated || !adminUser) {
+      setModalError('You must be authenticated to create/update campaigns. Please log in again.');
+      setIsSubmittingCampaign(false);
+      return;
+    }
 
     // Basic Validation
     if (!campaignFormData.name.trim()) {
@@ -196,34 +372,60 @@ const AdManagement = () => {
     }
 
     try {
+      // Ensure we have a valid session before making the request
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Authentication session expired. Please log in again.');
+      }
+      
+      if (!session) {
+        throw new Error('No active session found. Please log in again.');
+      }
+      
+      console.log('Authenticated user attempting campaign operation:', session.user.email);
       const campaignDataToSubmit = {
         ...campaignFormData,
         budget: parseFloat(campaignFormData.budget),
         // Ensure dates are in ISO format if not already, or null if empty for end_date
         start_date: campaignFormData.start_date ? new Date(campaignFormData.start_date).toISOString() : null,
         end_date: campaignFormData.end_date ? new Date(campaignFormData.end_date).toISOString() : null,
+        target: campaignFormData.target_audience.trim() || 'General Audience' // Required field
       };
 
-      const { data, error: insertError } = await supabase
-        .from('ad_campaigns')
-        .insert([campaignDataToSubmit])
-        .select(); // .select() is important to get back the inserted row(s)
+      if (editingCampaign) {
+        // Update existing campaign
+        const { data, error: updateError } = await supabase
+          .from('ad_campaigns')
+          .update(campaignDataToSubmit)
+          .eq('id', editingCampaign.id)
+          .select();
 
-      if (insertError) throw insertError;
+        if (updateError) throw updateError;
+        console.log('Campaign updated:', data);
+      } else {
+        // Create new campaign
+        const { data, error: insertError } = await supabase
+          .from('ad_campaigns')
+          .insert([campaignDataToSubmit])
+          .select();
 
-      // Success
-      console.log('Campaign added:', data);
+        if (insertError) throw insertError;
+        console.log('Campaign added:', data);
+      }
+
       handleCloseCampaignModal();
-      // Go to first page to see new campaign, assuming it's ordered by creation date descending
-      if (currentPage !== 1) {
+      // Go to first page to see new/updated campaign, assuming it's ordered by creation date descending
+      if (currentPage !== 1 && !editingCampaign) {
         setCurrentPage(1);
       } else {
-        fetchCampaignsAndStats(); // If already on page 1, just refresh
+        fetchCampaignsAndStats(); // Refresh the current page
       }
 
     } catch (err) {
       console.error('Error submitting campaign:', err);
-      setModalError(`Failed to add campaign: ${err.message || 'Unknown error'}`);
+      setModalError(`Failed to ${editingCampaign ? 'update' : 'add'} campaign: ${err.message || 'Unknown error'}`);
     } finally {
       setIsSubmittingCampaign(false);
     }
@@ -329,6 +531,7 @@ const AdManagement = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-textLight/50 uppercase tracking-wider">Target</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-textLight/50 uppercase tracking-wider">Performance</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-textLight/50 uppercase tracking-wider">Timeline</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-textLight/50 uppercase tracking-wider">Direct Link</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-textLight/50 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
@@ -372,9 +575,54 @@ const AdManagement = () => {
                           <div>End: {formatDate(campaign.end_date)}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                        <button className="text-royalGold hover:text-royalGold/80 mr-4">Edit</button>
-                        <button className="text-rubyRed hover:text-rubyRed/80">Delete</button>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {campaign.direct_link ? (
+                          <a 
+                            href={campaign.direct_link} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-royalGold hover:text-royalGold/80 underline break-all"
+                          >
+                            {campaign.direct_link.length > 30 ? 
+                              campaign.direct_link.substring(0, 30) + '...' : 
+                              campaign.direct_link
+                            }
+                          </a>
+                        ) : (
+                          <span className="text-xs text-textLight/40">No link</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm" style={{position: 'relative', zIndex: 10}}>
+                        <div className="flex justify-end space-x-2" style={{position: 'relative', zIndex: 20}}>
+                           <button 
+                               type="button"
+                               onClick={(e) => {
+                                 e.preventDefault();
+                                 e.stopPropagation();
+                                 alert(`Edit clicked for: ${campaign.name}`);
+                                 console.log('Edit button clicked for campaign:', campaign);
+                                 handleEditCampaign(campaign);
+                               }}
+                               className="bg-royalGold/20 hover:bg-royalGold/30 text-royalGold px-3 py-1 rounded text-xs transition-colors font-medium cursor-pointer"
+                               style={{pointerEvents: 'auto', zIndex: 1000}}
+                             >
+                               Edit
+                             </button>
+                             <button 
+                               type="button"
+                               onClick={(e) => {
+                                 e.preventDefault();
+                                 e.stopPropagation();
+                                 console.log('Delete button clicked for campaign:', campaign);
+                                 handleDeleteCampaign(campaign.id);
+                               }}
+                               disabled={isDeletingCampaign === campaign.id}
+                               className="bg-rubyRed/20 hover:bg-rubyRed/30 text-rubyRed px-3 py-1 rounded text-xs transition-colors disabled:opacity-50 font-medium cursor-pointer"
+                               style={{pointerEvents: 'auto', zIndex: 1000}}
+                             >
+                               {isDeletingCampaign === campaign.id ? 'Deleting...' : 'Delete'}
+                             </button>
+                         </div>
                       </td>
                     </tr>
                   ))}
@@ -449,7 +697,7 @@ const AdManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out opacity-100">
           <div className="bg-deepLapisDark arabesque-border-modal p-6 rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-textGold">Add New Campaign</h2>
+              <h2 className="text-xl font-semibold text-textGold">{editingCampaign ? 'Edit Campaign' : 'Add New Campaign'}</h2>
               <button onClick={handleCloseCampaignModal} className="text-textLight/70 hover:text-textGold">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
@@ -580,6 +828,20 @@ const AdManagement = () => {
                 />
               </div>
 
+              <div>
+                <label htmlFor="direct_link" className="block text-sm font-medium text-textLight/90 mb-1">Direct Link (Optional)</label>
+                <input 
+                  type="url" 
+                  name="direct_link" 
+                  id="direct_link" 
+                  value={campaignFormData.direct_link} 
+                  onChange={handleCampaignInputChange} 
+                  className="w-full p-2 bg-deepLapisLight/60 border border-royalGold/30 rounded-md focus:ring-royalGold focus:border-royalGold text-textLight placeholder-textLight/50"
+                  placeholder="e.g., https://example.com/promo-page"
+                />
+                <p className="text-xs text-textLight/60 mt-1">This link will appear to users in the game when they interact with your ad</p>
+              </div>
+
               <div className="pt-4 flex justify-end space-x-3">
                 <button 
                   type="button" 
@@ -600,7 +862,7 @@ const AdManagement = () => {
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                   ) : null}
-                  {isSubmittingCampaign ? 'Creating...' : 'Create Campaign'}
+                  {isSubmittingCampaign ? (editingCampaign ? 'Updating...' : 'Creating...') : (editingCampaign ? 'Update Campaign' : 'Create Campaign')}
                 </button>
               </div>
             </form>

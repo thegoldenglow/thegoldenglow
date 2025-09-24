@@ -322,70 +322,7 @@ export default function AdsWidget() {
         </div>
       )}
 
-      {/* List of available ads */}
-      <div className="mb-4">
-        <div className="text-sm text-textLight/70 mb-2">Available Ads</div>
-        <div className="space-y-2 max-h-40 overflow-auto pr-1">
-          {ads.length === 0 ? (
-            <div className="text-xs text-textLight/50">No ads in the list.</div>
-          ) : (
-            ads.map((ad, idx) => {
-              const id = extractYouTubeId(ad.url);
-              return (
-                <div key={ad.id} className="flex items-center justify-between text-xs">
-                  <button
-                    type="button"
-                    className={`truncate text-left mr-2 hover:text-textGold ${idx === selectedIndex ? 'text-textGold' : 'text-textLight/80'}`}
-                    title={ad.url}
-                    onClick={() => setSelectedIndex(idx)}
-                  >
-                    {id ? `YouTube: ${id}` : ad.url}
-                  </button>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <a href={ad.url} target="_blank" rel="noopener noreferrer" className="text-royalGold hover:text-textGold">
-                      View
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(ad)}
-                      className="text-red-300 hover:text-red-400"
-                      title="Delete"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
 
-      {/* Add new link */}
-      <div className="mt-2">
-        <div className="text-sm text-textLight/70 mb-2">Add YouTube link</div>
-        <div className="flex items-center gap-2">
-          <input
-            type="url"
-            value={newLink}
-            onChange={(e) => setNewLink(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
-            placeholder="https://www.youtube.com/watch?v=..."
-            className="flex-1 p-2 bg-deepLapisLight/60 border border-royalGold/30 rounded-md focus:ring-royalGold focus:border-royalGold text-textLight placeholder-textLight/50"
-          />
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={adding}
-            className="px-3 py-2 text-sm font-medium text-deepLapisDark bg-royalGold hover:bg-goldHover rounded-md transition-colors disabled:opacity-50 disabled:bg-royalGold/50"
-          >
-            {adding ? 'Adding...' : 'Add'}
-          </button>
-        </div>
-        {info && !error ? (
-          <div className="mt-2 text-xs text-emeraldGreen">{info}</div>
-        ) : null}
-      </div>
 
       {/* Controls */}
       <div className="mt-4 flex items-center justify-between">

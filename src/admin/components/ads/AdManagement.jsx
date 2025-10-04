@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../utils/supabase';
+import { supabase, isSupabaseAvailable } from '../../utils/supabase';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 const AdManagement = () => {
@@ -29,8 +29,18 @@ const AdManagement = () => {
     status: 'Draft', // Default status
     goal: '',
     direct_link: '', // Direct link for ads to appear in game
+    video_url: '', // YouTube video URL for Video type campaigns
+    reward_amount: 50, // Credits users earn for watching (default 50)
+    required_watch_percentage: 80, // % of video user must watch (default 80%)
   };
+
   const [campaignFormData, setCampaignFormData] = useState(initialCampaignFormData);
+
+  // Debug logging for campaign type changes
+  useEffect(() => {
+    console.log('Campaign type changed:', campaignFormData.type);
+    console.log('Should show video fields:', campaignFormData.type === 'Video');
+  }, [campaignFormData.type]);
   const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
   const [modalError, setModalError] = useState(null);
   const [editingCampaign, setEditingCampaign] = useState(null);
@@ -115,39 +125,12 @@ const AdManagement = () => {
     }
   ];
 
-  // Fetch campaigns and stats from Supabase or use demo data
+  // Fetch campaigns and stats from Supabase only
   const fetchCampaignsAndStats = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      // Check if we're in demo mode
-      const storedAdmin = localStorage.getItem('adminUser');
-      const isDemoMode = storedAdmin && !adminUser?.id?.startsWith('auth_');
-      
-      if (isDemoMode) {
-        // Use demo data, but filter out deleted campaigns
-        console.log('Demo mode: Using demo campaign data');
-        
-        // Get deleted campaign IDs from localStorage
-        const deletedCampaigns = JSON.parse(localStorage.getItem('deletedDemoCampaigns') || '[]');
-        const filteredDemoCampaigns = demoCampaigns.filter(campaign => 
-          !deletedCampaigns.includes(campaign.id)
-        );
-        
-        setTotalCampaigns(filteredDemoCampaigns.length);
-        
-        // Calculate range for pagination
-        const from = (currentPage - 1) * campaignsPerPage;
-        const to = from + campaignsPerPage;
-        
-        const paginatedCampaigns = filteredDemoCampaigns.slice(from, to);
-        setCampaigns(paginatedCampaigns);
-        
-        setLoading(false);
-        return;
-      }
-      
       // Production mode: Use Supabase
       // Get total count
       const { count, error: countError } = await supabase
@@ -249,6 +232,10 @@ const AdManagement = () => {
        end_date: campaign.end_date ? new Date(campaign.end_date).toISOString().split('T')[0] : '',
        status: campaign.status || 'Draft',
        goal: campaign.goal || '',
+       direct_link: campaign.direct_link || '',
+       video_url: campaign.video_url || '',
+       reward_amount: campaign.reward_amount || 50,
+       required_watch_percentage: campaign.required_watch_percentage || 80,
      });
      setEditingCampaign(campaign);
      setModalError(null);
@@ -271,26 +258,6 @@ const AdManagement = () => {
     setIsDeletingCampaign(campaignId);
     
     try {
-      // Check if we're in demo mode (localStorage-based auth)
-      const storedAdmin = localStorage.getItem('adminUser');
-      const isDemoMode = storedAdmin && !adminUser.id?.startsWith('auth_');
-      
-      if (isDemoMode) {
-        // Demo mode: Store deleted campaign ID in localStorage
-        console.log('Demo mode: Storing deleted campaign ID in localStorage');
-        
-        const deletedCampaigns = JSON.parse(localStorage.getItem('deletedDemoCampaigns') || '[]');
-        if (!deletedCampaigns.includes(campaignId)) {
-          deletedCampaigns.push(campaignId);
-          localStorage.setItem('deletedDemoCampaigns', JSON.stringify(deletedCampaigns));
-        }
-        
-        // Refresh the campaigns list to reflect the deletion
-        fetchCampaignsAndStats();
-        console.log('Campaign deleted successfully (demo mode)');
-        return;
-      }
-      
       // Production mode: Use Supabase
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
@@ -370,9 +337,26 @@ const AdManagement = () => {
       setIsSubmittingCampaign(false);
       return;
     }
+    // Video-specific validation
+    if (campaignFormData.type === 'Video' && !campaignFormData.video_url?.trim()) {
+      setModalError('YouTube Video URL is required for Video campaigns.');
+      setIsSubmittingCampaign(false);
+      return;
+    }
 
     try {
-      // Ensure we have a valid session before making the request
+      const campaignDataToSubmit = {
+        ...campaignFormData,
+        budget: parseFloat(campaignFormData.budget),
+        reward_amount: parseInt(campaignFormData.reward_amount) || 50,
+        required_watch_percentage: parseInt(campaignFormData.required_watch_percentage) || 80,
+        // Ensure dates are in ISO format if not already, or null if empty for end_date
+        start_date: campaignFormData.start_date ? new Date(campaignFormData.start_date).toISOString() : null,
+        end_date: campaignFormData.end_date ? new Date(campaignFormData.end_date).toISOString() : null,
+        target: campaignFormData.target_audience.trim() || 'General Audience' // Required field
+      };
+
+      // Production mode: Use Supabase
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
@@ -385,14 +369,6 @@ const AdManagement = () => {
       }
       
       console.log('Authenticated user attempting campaign operation:', session.user.email);
-      const campaignDataToSubmit = {
-        ...campaignFormData,
-        budget: parseFloat(campaignFormData.budget),
-        // Ensure dates are in ISO format if not already, or null if empty for end_date
-        start_date: campaignFormData.start_date ? new Date(campaignFormData.start_date).toISOString() : null,
-        end_date: campaignFormData.end_date ? new Date(campaignFormData.end_date).toISOString() : null,
-        target: campaignFormData.target_audience.trim() || 'General Audience' // Required field
-      };
 
       if (editingCampaign) {
         // Update existing campaign
@@ -450,6 +426,29 @@ const AdManagement = () => {
             {error}
           </div>
         )}
+
+        {/* Supabase Connection Status */}
+        <div className="mt-2 text-sm flex items-center justify-between">
+          <div>
+            {isSupabaseAvailable() ? (
+              <span className="text-emeraldGreen">✅ Supabase Connected</span>
+            ) : (
+              <span className="text-rubyRed">❌ Supabase Not Configured</span>
+            )}
+          </div>
+          {localStorage.getItem('adminUser') && (
+            <button
+              onClick={() => {
+                localStorage.removeItem('adminUser');
+                window.location.reload();
+              }}
+              className="text-xs text-royalGold hover:text-goldHover underline"
+              title="Clear localStorage admin session and reload"
+            >
+              Clear Demo Session
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Add New Campaign Button */}
@@ -695,7 +694,7 @@ const AdManagement = () => {
       {/* Add/Edit Campaign Modal */}
       {isCampaignModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ease-in-out opacity-100">
-          <div className="bg-deepLapisDark arabesque-border-modal p-6 rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-deepLapisDark arabesque-border-modal p-6 rounded-lg shadow-2xl w-full max-w-lg max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-textGold">{editingCampaign ? 'Edit Campaign' : 'Add New Campaign'}</h2>
               <button onClick={handleCloseCampaignModal} className="text-textLight/70 hover:text-textGold">
@@ -828,19 +827,102 @@ const AdManagement = () => {
                 />
               </div>
 
-              <div>
-                <label htmlFor="direct_link" className="block text-sm font-medium text-textLight/90 mb-1">Direct Link (Optional)</label>
-                <input 
-                  type="url" 
-                  name="direct_link" 
-                  id="direct_link" 
-                  value={campaignFormData.direct_link} 
-                  onChange={handleCampaignInputChange} 
-                  className="w-full p-2 bg-deepLapisLight/60 border border-royalGold/30 rounded-md focus:ring-royalGold focus:border-royalGold text-textLight placeholder-textLight/50"
-                  placeholder="e.g., https://example.com/promo-page"
-                />
-                <p className="text-xs text-textLight/60 mt-1">This link will appear to users in the game when they interact with your ad</p>
-              </div>
+              {/* Video-Specific Fields - Only show when type is "Video" */}
+              {campaignFormData.type === 'Video' && (
+                <div className="p-4 bg-deepLapis/40 rounded-lg border border-royalGold/20 space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">🎥</span>
+                    <h4 className="text-sm font-medium text-textGold">Video Campaign Settings</h4>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label htmlFor="video_url" className="block text-sm font-medium text-textLight/90">
+                        YouTube Video URL <span className="text-rubyRed">*</span>
+                      </label>
+                      {campaignFormData.video_url?.trim() ? (
+                        <a
+                          href={campaignFormData.video_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-royalGold hover:text-goldHover underline"
+                          title="Open current video URL in a new tab"
+                        >
+                          Preview
+                        </a>
+                      ) : null}
+                    </div>
+                    <input
+                      type="url"
+                      name="video_url"
+                      id="video_url"
+                      value={campaignFormData.video_url}
+                      onChange={handleCampaignInputChange}
+                      className="w-full p-2 bg-deepLapisLight/60 border border-royalGold/30 rounded-md focus:ring-royalGold focus:border-royalGold text-textLight placeholder-textLight/50"
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      required={campaignFormData.type === 'Video'}
+                    />
+                    <p className="text-xs text-textLight/60 mt-1">
+                      Users must provide a valid YouTube link (watch, shorts, or youtu.be)
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="reward_amount" className="block text-sm font-medium text-textLight/90 mb-1">
+                        Reward Amount (Credits)
+                      </label>
+                      <input
+                        type="number"
+                        name="reward_amount"
+                        id="reward_amount"
+                        value={campaignFormData.reward_amount}
+                        onChange={handleCampaignInputChange}
+                        className="w-full p-2 bg-deepLapisLight/60 border border-royalGold/30 rounded-md focus:ring-royalGold focus:border-royalGold text-textLight placeholder-textLight/50"
+                        placeholder="50"
+                        min="1"
+                        max="1000"
+                      />
+                      <p className="text-xs text-textLight/60 mt-1">Golden Credits users earn</p>
+                    </div>
+
+                    <div>
+                      <label htmlFor="required_watch_percentage" className="block text-sm font-medium text-textLight/90 mb-1">
+                        Required Watch (%)
+                      </label>
+                      <input
+                        type="number"
+                        name="required_watch_percentage"
+                        id="required_watch_percentage"
+                        value={campaignFormData.required_watch_percentage}
+                        onChange={handleCampaignInputChange}
+                        className="w-full p-2 bg-deepLapisLight/60 border border-royalGold/30 rounded-md focus:ring-royalGold focus:border-royalGold text-textLight placeholder-textLight/50"
+                        placeholder="80"
+                        min="50"
+                        max="100"
+                      />
+                      <p className="text-xs text-textLight/60 mt-1">% of video to watch</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Direct Link - Show for non-Video campaigns */}
+              {campaignFormData.type !== 'Video' && (
+                <div>
+                  <label htmlFor="direct_link" className="block text-sm font-medium text-textLight/90 mb-1">Direct Link (Optional)</label>
+                  <input
+                    type="url"
+                    name="direct_link"
+                    id="direct_link"
+                    value={campaignFormData.direct_link}
+                    onChange={handleCampaignInputChange}
+                    className="w-full p-2 bg-deepLapisLight/60 border border-royalGold/30 rounded-md focus:ring-royalGold focus:border-royalGold text-textLight placeholder-textLight/50"
+                    placeholder="e.g., https://example.com/promo-page"
+                  />
+                  <p className="text-xs text-textLight/60 mt-1">This link will appear to users in the game when they interact with your ad</p>
+                </div>
+              )}
 
               <div className="pt-4 flex justify-end space-x-3">
                 <button 

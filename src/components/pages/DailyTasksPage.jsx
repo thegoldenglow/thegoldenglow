@@ -9,6 +9,7 @@ import AdRewardModal from '../tasks/AdRewardModal';
 import DebugSupabase from '../debug/DebugSupabase';
 import { getNextMilestone, getTimeUntilExpiration } from '../../utils/taskUtils';
 import AdsWidget from '../ads/AdsWidget';
+import TelegramLayoutFix from '../layout/TelegramLayoutFix.jsx';
 
 const DailyTasksPage = () => {
   const { state, tasksManager, verifyTask } = useTasks();
@@ -365,7 +366,8 @@ const DailyTasksPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-deepLapis via-deepLapisDark to-black/60 pt-6 pb-24">
+    <TelegramLayoutFix>
+    <div id="daily-tasks-container" data-render-mode="div" className="min-h-screen bg-gradient-to-b from-deepLapis via-deepLapisDark to-black/60 pt-6 pb-24" style={{ display: 'block' }}>
       <div className="container mx-auto px-4 max-w-3xl">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-primary text-textGold">Daily Tasks</h1>
@@ -455,6 +457,7 @@ const DailyTasksPage = () => {
         )}
       </div>
     </div>
+    </TelegramLayoutFix>
   );
 };
 

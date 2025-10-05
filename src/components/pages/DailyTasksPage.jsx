@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTasks } from '../../contexts/TasksContext';
+import { useWallet } from '../../contexts/WalletContext';
 import { useUser } from '../../contexts/UserContext';
 import TaskList from '../tasks/TaskList';
 import StreakCalendar from '../tasks/StreakCalendar';
@@ -13,6 +14,7 @@ import TelegramLayoutFix from '../layout/TelegramLayoutFix.jsx';
 
 const DailyTasksPage = () => {
   const { state, tasksManager, verifyTask } = useTasks();
+  const { addTransaction } = useWallet();
   const { user, isAuthenticated } = useUser();
   const [timeUntilReset, setTimeUntilReset] = useState('');
   const [showAdModal, setShowAdModal] = useState(false);
@@ -385,7 +387,19 @@ const DailyTasksPage = () => {
               onNavigate={handleTaskNavigation}
               onClaim={async (taskId) => {
                 try {
-                  await tasksManager.claimTaskReward(taskId, false);
+                  const ok = await tasksManager.claimTaskReward(taskId, false);
+                  if (ok && Array.isArray(state.tasks)) {
+                    const task = state.tasks.find(t => t.id === taskId);
+                    if (task && Array.isArray(task.rewards)) {
+                      const coinReward = task.rewards
+                        .filter(r => (r.type || '').toUpperCase() === 'MYSTIC_COINS')
+                        .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+                      if (coinReward > 0) {
+                        // Record wallet transaction and update user points
+                        addTransaction(coinReward, 'task_reward', task.title || 'Task reward claimed');
+                      }
+                    }
+                  }
                 } catch (e) {
                   console.error('DailyTasksPage: failed to claim reward', e);
                 }
@@ -446,7 +460,18 @@ const DailyTasksPage = () => {
             onClose={() => setShowAdModal(false)}
             onAdCompleted={async () => {
               try {
-                if (currentTaskForAd) await tasksManager.claimTaskReward(currentTaskForAd.id, true);
+                if (currentTaskForAd) {
+                  const ok = await tasksManager.claimTaskReward(currentTaskForAd.id, true);
+                  if (ok && Array.isArray(currentTaskForAd.rewards)) {
+                    const coinReward = currentTaskForAd.rewards
+                      .filter(r => (r.type || '').toUpperCase() === 'MYSTIC_COINS')
+                      .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+                    const doubled = coinReward * 2;
+                    if (doubled > 0) {
+                      addTransaction(doubled, 'ad_boost_reward', currentTaskForAd.title || 'Ad-boosted task reward');
+                    }
+                  }
+                }
               } catch (e) {
                 console.error('DailyTasksPage: ad reward failed', e);
               } finally {

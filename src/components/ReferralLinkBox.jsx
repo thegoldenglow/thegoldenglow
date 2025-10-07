@@ -21,7 +21,7 @@ const ReferralLinkBox = () => {
         setLoading(true);
         try {
           // Initialize with default value in case of errors
-          setReferralLink('https://t.me/TheGoldenGlow_bot');
+          setReferralLink('https://t.me/GoldenGlowGlobal');
           
           // Get referral link with proper await
           const link = await generateTelegramReferralLink();

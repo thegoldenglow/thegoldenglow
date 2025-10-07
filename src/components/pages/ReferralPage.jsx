@@ -50,7 +50,7 @@ const ReferralPage = () => {
           await getUserReferrals();
         } catch (error) {
           console.error('Error generating referral data:', error);
-          setReferralLink('https://t.me/TheGoldenGlow_bot');
+          setReferralLink('https://t.me/GoldenGlowGlobal');
         }
       }
     };

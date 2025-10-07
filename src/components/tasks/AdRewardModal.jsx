@@ -1,10 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { formatReward } from '../../utils/taskUtils';
+import YouTubeVideoPlayer from '../ads/YouTubeVideoPlayer';
+import { supabase } from '../../utils/supabase';
+
+// Minimal YouTube URL parser supporting common patterns
+function extractYouTubeId(url) {
+  if (!url) return null;
+  try {
+    const shorts = url.match(/youtube\.com\/shorts\/([\w-]{6,})/i);
+    if (shorts) return shorts[1];
+    const watch = url.match(/[?&]v=([\w-]{6,})/i);
+    if (watch) return watch[1];
+    const youtu = url.match(/youtu\.be\/([\w-]{6,})/i);
+    if (youtu) return youtu[1];
+    const u = new URL(url);
+    const seg = u.pathname.split('/').filter(Boolean).pop();
+    if (seg && /^[\w-]{6,}$/.test(seg)) return seg;
+  } catch (_) {
+    return null;
+  }
+  return null;
+}
 
 const AdRewardModal = ({ task, onClose, onAdCompleted }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [adProgress, setAdProgress] = useState(0);
   const [adFinished, setAdFinished] = useState(false);
+  const [campaigns, setCampaigns] = useState([]);
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(true);
+  const [campaignError, setCampaignError] = useState('');
+  const [isPlaying, setIsPlaying] = useState(false);
   
   // Calculate doubled rewards
   const regularRewards = task?.rewards || [];
@@ -17,27 +43,38 @@ const AdRewardModal = ({ task, onClose, onAdCompleted }) => {
   const formattedRegularRewards = regularRewards.map(formatReward);
   const formattedDoubledRewards = doubledRewards.map(formatReward);
   
-  // Simulate ad loading and viewing
+  // Load active video campaigns once when modal opens
   useEffect(() => {
-    if (isLoading) {
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 5;
-        setAdProgress(progress);
-        
-        if (progress >= 100) {
-          clearInterval(interval);
-          setAdFinished(true);
-          setIsLoading(false);
+    let cancelled = false;
+    async function loadCampaigns() {
+      setLoadingCampaigns(true);
+      setCampaignError('');
+      try {
+        const { data, error } = await supabase
+          .from('ad_campaigns')
+          .select('id, name, description, direct_link, video_url, reward_amount, required_watch_percentage, status, created_at')
+          .eq('type', 'Video')
+          .eq('status', 'Active')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        const cleaned = (data || []).filter((c) => !!extractYouTubeId(c.video_url || c.direct_link));
+        if (!cancelled) {
+          setCampaigns(cleaned);
+          setSelectedCampaign(cleaned[0] || null);
         }
-      }, 200); // Full ad takes about 4 seconds
-      
-      return () => clearInterval(interval);
+      } catch (e) {
+        if (!cancelled) setCampaignError(e?.message || 'Failed to load video campaigns');
+      } finally {
+        if (!cancelled) setLoadingCampaigns(false);
+      }
     }
-  }, [isLoading]);
+    loadCampaigns();
+    return () => { cancelled = true; };
+  }, []);
   
   const handleStartAd = () => {
-    setIsLoading(true);
+    // Switch to video playback view
+    setIsPlaying(true);
   };
   
   const handleAdFinished = () => {
@@ -47,7 +84,7 @@ const AdRewardModal = ({ task, onClose, onAdCompleted }) => {
   return (
     <div className="fixed inset-0 bg-deepLapis/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
       <div className="bg-deepLapisDark border border-royalGold/50 rounded-lg max-w-md w-full p-5 shadow-xl">
-        {!isLoading && !adFinished ? (
+        {!isPlaying && !adFinished ? (
           // Pre-ad screen
           <div className="text-center">
             <h3 className="text-xl font-calligraphy text-textGold mb-4 shimmer">Watch the wisdom of the ancients</h3>
@@ -56,6 +93,18 @@ const AdRewardModal = ({ task, onClose, onAdCompleted }) => {
               <p className="text-textLight mb-4">
                 A short mystical vision will double your rewards
               </p>
+              {campaignError && (
+                <div className="mb-3 p-3 bg-rubyRed/10 border border-rubyRed/30 rounded text-rubyRed text-sm">
+                  {campaignError}
+                </div>
+              )}
+              {!campaignError && (
+                <div className="text-xs text-textLight/70 mb-2">
+                  {loadingCampaigns
+                    ? 'Loading available video...' 
+                    : (selectedCampaign ? `Ready to play: ${selectedCampaign.name}` : 'No active video campaigns available')}
+                </div>
+              )}
               
               <div className="flex justify-center">
                 <div className="flex items-center space-x-8">
@@ -94,7 +143,8 @@ const AdRewardModal = ({ task, onClose, onAdCompleted }) => {
             <div className="flex space-x-3">
               <button
                 onClick={handleStartAd}
-                className="flex-1 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors"
+                disabled={loadingCampaigns || !selectedCampaign}
+                className="flex-1 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Proceed
               </button>
@@ -106,36 +156,32 @@ const AdRewardModal = ({ task, onClose, onAdCompleted }) => {
               </button>
             </div>
           </div>
-        ) : isLoading ? (
-          // During-ad experience
-          <div className="text-center">
-            <h3 className="text-xl font-calligraphy text-textGold mb-4">Discovering ancient wisdom...</h3>
-            
-            {/* Progress bar */}
-            <div className="relative h-3 bg-deepLapis rounded-full mb-4 overflow-hidden">
-              <div 
-                className="absolute top-0 left-0 h-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all"
-                style={{ width: `${adProgress}%` }}
-              ></div>
-            </div>
-            
-            <p className="text-textGold">{adProgress}% complete</p>
-            
-            {/* Mystical animation as placeholder for ad content */}
-            <div className="my-8 flex justify-center">
-              <div className="w-32 h-32 border-4 border-royalGold/30 rounded-full relative animate-spin-slow">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-24 h-24 border-4 border-royalGold/50 rounded-full animate-spin-reverse"></div>
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-4xl animate-pulse">✨</div>
-                </div>
+        ) : isPlaying ? (
+          // During-ad experience (real video)
+          <div>
+            <h3 className="text-xl font-calligraphy text-textGold mb-3">Discovering ancient wisdom...</h3>
+            {loadingCampaigns && (
+              <div className="py-6 text-center text-textLight/70">
+                <div className="animate-spin w-10 h-10 border-3 border-royalGold/20 border-t-royalGold rounded-full mx-auto mb-3"></div>
+                Loading video campaign...
               </div>
-            </div>
-            
-            <p className="text-sm text-textLight italic">
-              The mystics are revealing their secrets...
-            </p>
+            )}
+            {!loadingCampaigns && selectedCampaign && (
+              <YouTubeVideoPlayer
+                campaign={selectedCampaign}
+                onComplete={() => {
+                  setAdFinished(true);
+                  setIsPlaying(false);
+                  onAdCompleted(true);
+                }}
+                onError={(msg) => setCampaignError(msg)}
+              />
+            )}
+            {!loadingCampaigns && !selectedCampaign && (
+              <div className="p-4 text-sm text-textLight/60 bg-deepLapis/40 rounded border border-royalGold/20">
+                No video campaigns available right now.
+              </div>
+            )}
           </div>
         ) : (
           // Post-ad screen

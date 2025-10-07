@@ -150,7 +150,7 @@ const EmbeddedPostViewer = ({ postUrl, requiredViewingTime = 30, onViewingComple
             className="w-full h-64 md:h-80 rounded-lg"
             frameBorder="0"
             scrolling="no"
-            allowTransparency="true"
+            allowtransparency="true"
             title="Instagram post"
           />
         );

@@ -511,7 +511,7 @@ export const UserProvider = ({ children }) => {
   }, [user]);
 
   const generateTelegramReferralLink = useCallback(async () => {
-    if (!user || !user.id) return 'https://t.me/GoldenGlowGlobal'; // Fallback
+    if (!user || !user.id) return 'https://t.me/YourBotName?start=default'; // Fallback
     return await generateTelegramBotReferralLink(user.id); // Assumes user.id is the correct Supabase ID
   }, [user]);
 

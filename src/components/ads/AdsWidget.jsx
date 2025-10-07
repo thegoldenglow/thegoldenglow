@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseAvailable } from '../../utils/supabase';
+import YouTubeVideoPlayer from './YouTubeVideoPlayer';
 
 // Minimal YouTube URL parser supporting common patterns
 function extractYouTubeId(url) {
@@ -22,330 +23,167 @@ function extractYouTubeId(url) {
   return null;
 }
 
-function toYouTubeEmbedUrl(url) {
-  const id = extractYouTubeId(url);
-  if (!id) return null;
-  return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&autoplay=0`;
-}
-
-// Local storage fallback key
-const LOCAL_KEY = 'gg_ads_fallback';
-
 export default function AdsWidget() {
-  const [ads, setAds] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [newLink, setNewLink] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [backendEnabled, setBackendEnabled] = useState(isSupabaseAvailable());
+  const [showRewardNotification, setShowRewardNotification] = useState(false);
+  const [lastReward, setLastReward] = useState(null);
 
-  const selectedAd = ads.length > 0 ? ads[selectedIndex] : null;
-  const selectedEmbed = useMemo(() => selectedAd ? toYouTubeEmbedUrl(selectedAd.url) : null, [selectedAd]);
+  const selectedCampaign = campaigns.length > 0 ? campaigns[selectedIndex] : null;
 
   useEffect(() => {
-    loadAds();
+    loadCampaigns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function syncLocalToSupabaseIfNeeded(current) {
-    if (!isSupabaseAvailable()) return;
-    // Read local
-    let local = [];
-    try {
-      const raw = localStorage.getItem(LOCAL_KEY);
-      local = raw ? JSON.parse(raw) : [];
-    } catch {}
-    if (!local || local.length === 0) return;
-
-    // Compute missing by URL
-    const currentUrls = new Set((current || []).map((r) => (r && r.url) || ''));
-    const missing = local
-      .filter((item) => item && item.url && extractYouTubeId(item.url))
-      .filter((item) => !currentUrls.has(item.url));
-
-    if (missing.length === 0) return;
-
-    try {
-      const { error: insErr } = await supabase
-        .from('ad_videos')
-        .insert(missing.map((m) => ({ url: m.url })));
-      if (insErr) throw insErr;
-      setInfo(`Synced ${missing.length} local ad(s) to cloud`);
-      // Remove synced from local
-      const remaining = local.filter((item) => !missing.find((m) => m.url === item.url));
-      try { localStorage.setItem(LOCAL_KEY, JSON.stringify(remaining)); } catch {}
-    } catch (e) {
-      // Keep silent, show gentle message
-      console.warn('Ad sync skipped:', e?.message || e);
-    }
-  }
-
-  function shouldFallbackToLocal(err) {
-    const msg = (err && (err.message || err.error_description || String(err))) || '';
-    return /relation .*ad_videos.* does not exist/i.test(msg) || /42P01/.test(msg) || /permission denied/i.test(msg);
-  }
-
-  async function loadAds() {
+  async function loadCampaigns() {
     setLoading(true);
     setError('');
     setInfo('');
     try {
-      if (isSupabaseAvailable() && backendEnabled) {
-        const { data, error: dbError } = await supabase
-          .from('ad_videos')
-          .select('id, url, created_at')
-          .order('created_at', { ascending: false });
-        if (dbError) throw dbError;
-        const cleaned = (data || []).filter((row) => !!extractYouTubeId(row.url));
-        // Attempt to sync local items that are not yet in DB
-        await syncLocalToSupabaseIfNeeded(cleaned);
-        // Refetch after potential sync to reflect latest
-        let finalList = cleaned;
-        if (isSupabaseAvailable()) {
-          const { data: data2 } = await supabase
-            .from('ad_videos')
-            .select('id, url, created_at')
-            .order('created_at', { ascending: false });
-          if (data2) {
-            finalList = (data2 || []).filter((row) => !!extractYouTubeId(row.url));
-          }
-        }
-        setAds(finalList);
-        if (finalList.length > 0) {
-          setSelectedIndex(Math.floor(Math.random() * finalList.length));
-        }
-        setInfo(finalList.length === 0 ? 'No ads configured yet.' : '');
-      } else {
-        // Fallback to local storage when Supabase unavailable or backend disabled
-        let local = [];
-        try {
-          const raw = localStorage.getItem(LOCAL_KEY);
-          local = raw ? JSON.parse(raw) : [];
-        } catch {}
-        const cleaned = (local || []).filter((item) => !!extractYouTubeId(item.url));
-        setAds(cleaned);
-        if (cleaned.length > 0) {
-          setSelectedIndex(Math.floor(Math.random() * cleaned.length));
-        }
-        setInfo('Guest mode: using local storage');
+      // Load active video campaigns from ad_campaigns table (Supabase-only)
+      const { data, error: dbError } = await supabase
+        .from('ad_campaigns')
+        .select('id, name, description, direct_link, video_url, reward_amount, required_watch_percentage, status, created_at')
+        .eq('type', 'Video')
+        .eq('status', 'Active')
+        .order('created_at', { ascending: false });
+      
+      if (dbError) throw dbError;
+      
+      // Filter to only campaigns with valid YouTube URLs
+      const cleaned = (data || []).filter((campaign) => {
+        const videoUrl = campaign.video_url || campaign.direct_link;
+        return !!extractYouTubeId(videoUrl);
+      });
+      
+      setCampaigns(cleaned);
+      if (cleaned.length > 0) {
+        setSelectedIndex(Math.floor(Math.random() * cleaned.length));
       }
+      setInfo(cleaned.length === 0 ? 'No active video campaigns available.' : '');
     } catch (e) {
-      console.error('Failed to load ads', e);
-      if (shouldFallbackToLocal(e)) {
-        setBackendEnabled(false);
-        let local = [];
-        try { const raw = localStorage.getItem(LOCAL_KEY); local = raw ? JSON.parse(raw) : []; } catch {}
-        const cleaned = (local || []).filter((item) => !!extractYouTubeId(item.url));
-        setAds(cleaned);
-        if (cleaned.length > 0) setSelectedIndex(Math.floor(Math.random() * cleaned.length));
-        setInfo('Guest mode: using local storage');
-        setError('');
-      } else {
-        setError(e?.message || 'Failed to load ads');
-      }
+      console.error('Failed to load video campaigns', e);
+      setError(e?.message || 'Failed to load video campaigns');
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleAdd() {
-    setError('');
-    setInfo('');
-    const id = extractYouTubeId(newLink.trim());
-    if (!newLink.trim() || !id) {
-      setError('Please enter a valid YouTube URL');
-      return;
-    }
-
-    setAdding(true);
-    try {
-      if (isSupabaseAvailable() && backendEnabled) {
-        const { data, error: insError } = await supabase
-          .from('ad_videos')
-          .insert({ url: newLink.trim() })
-          .select('id, url, created_at')
-          .single();
-        if (insError) {
-          if (shouldFallbackToLocal(insError)) {
-            setBackendEnabled(false);
-            throw insError; // jump to catch and do local insert
-          }
-          throw insError;
-        }
-        setAds((prev) => [data, ...prev]);
-        setInfo('Ad link added successfully');
-      }
-
-      if (!isSupabaseAvailable() || !backendEnabled) {
-        // Local fallback insert
-        let local = [];
-        try {
-          const raw = localStorage.getItem(LOCAL_KEY);
-          local = raw ? JSON.parse(raw) : [];
-        } catch {}
-        // Prevent duplicates by URL
-        const exists = (local || []).some((x) => x.url === newLink.trim());
-        if (exists) {
-          setInfo('Link already exists locally');
-        } else {
-          const entry = {
-            id: `local-${Date.now()}`,
-            url: newLink.trim(),
-            created_at: new Date().toISOString(),
-          };
-          const next = [entry, ...local];
-          try {
-            localStorage.setItem(LOCAL_KEY, JSON.stringify(next));
-          } catch {}
-          setAds((prev) => [entry, ...prev]);
-          setInfo('Saved locally (guest mode). Will sync when online.');
-        }
-      }
-      // Select the newly added ad
-      setSelectedIndex(0);
-      setNewLink('');
-    } catch (e) {
-      // If we got here due to fallback condition, perform local insert path
-      if (shouldFallbackToLocal(e)) {
-        let local = [];
-        try { const raw = localStorage.getItem(LOCAL_KEY); local = raw ? JSON.parse(raw) : []; } catch {}
-        const exists = (local || []).some((x) => x.url === newLink.trim());
-        if (!exists) {
-          const entry = { id: `local-${Date.now()}`, url: newLink.trim(), created_at: new Date().toISOString() };
-          const next = [entry, ...local];
-          try { localStorage.setItem(LOCAL_KEY, JSON.stringify(next)); } catch {}
-          setAds((prev) => [entry, ...prev]);
-          setInfo('Saved locally (guest mode). Will sync when online.');
-          setSelectedIndex(0);
-          setNewLink('');
-        } else {
-          setInfo('Link already exists locally');
-        }
-      } else {
-        console.error('Failed to add ad link', e);
-        setError(e?.message || 'Failed to add link');
-      }
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  async function handleDelete(ad) {
-    setError('');
-    setInfo('');
-    try {
-      if (!ad) return;
-      // If local entry or backend disabled, remove from local storage
-      if (!isSupabaseAvailable() || !backendEnabled || String(ad.id).startsWith('local-')) {
-        let local = [];
-        try { const raw = localStorage.getItem(LOCAL_KEY); local = raw ? JSON.parse(raw) : []; } catch {}
-        const next = (local || []).filter((x) => x.url !== ad.url);
-        try { localStorage.setItem(LOCAL_KEY, JSON.stringify(next)); } catch {}
-        setAds((prev) => prev.filter((x) => x.url !== ad.url));
-        setInfo('Removed');
-        return;
-      }
-
-      const { error: delErr } = await supabase
-        .from('ad_videos')
-        .delete()
-        .eq('id', ad.id);
-      if (delErr) {
-        if (shouldFallbackToLocal(delErr)) {
-          setBackendEnabled(false);
-          return handleDelete(ad); // retry as local
-        }
-        throw delErr;
-      }
-      setAds((prev) => prev.filter((x) => x.id !== ad.id));
-      setInfo('Removed');
-    } catch (e) {
-      console.error('Delete failed', e);
-      setError(e?.message || 'Failed to delete');
-    }
-  }
-
-  function shuffleAd() {
-    if (ads.length < 2) return;
-    let next = Math.floor(Math.random() * ads.length);
+  function shuffleCampaign() {
+    if (campaigns.length < 2) return;
+    let next = Math.floor(Math.random() * campaigns.length);
     if (next === selectedIndex) {
-      next = (next + 1) % ads.length;
+      next = (next + 1) % campaigns.length;
     }
     setSelectedIndex(next);
   }
 
+  const handleVideoComplete = (result) => {
+    console.log('Video completed with result:', result);
+    setLastReward(result);
+    setShowRewardNotification(true);
+    
+    // Hide notification after 5 seconds
+    setTimeout(() => {
+      setShowRewardNotification(false);
+    }, 5000);
+  };
+
+  const handleVideoError = (errorMsg) => {
+    console.error('Video player error:', errorMsg);
+    setError(errorMsg);
+  };
+
   return (
     <div className="bg-deepLapisDark/60 rounded-lg p-4 border border-royalGold/30">
-      <h3 className="text-lg font-primary text-textGold mb-3">Sponsored Videos</h3>
+      <div className="flex justify-between items-center mb-3">
+        <h3 className="text-lg font-primary text-textGold">Sponsored Videos</h3>
+        {campaigns.length > 1 && (
+          <span className="text-xs text-textLight/60">
+            {selectedIndex + 1} of {campaigns.length}
+          </span>
+        )}
+      </div>
 
       {loading ? (
-        <div className="py-6 text-center text-textLight/70">Loading ads...</div>
+        <div className="py-6 text-center text-textLight/70">
+          <div className="animate-spin w-10 h-10 border-3 border-royalGold/20 border-t-royalGold rounded-full mx-auto mb-3"></div>
+          Loading video campaigns...
+        </div>
       ) : error ? (
         <div className="mb-3 p-3 bg-rubyRed/10 border border-rubyRed/30 rounded text-rubyRed text-sm">{error}</div>
       ) : null}
 
-      {selectedEmbed ? (
+      {selectedCampaign ? (
         <div className="mb-4">
-          <div className="aspect-video w-full overflow-hidden rounded-lg border border-royalGold/30">
-            <iframe
-              src={selectedEmbed}
-              className="w-full h-full"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              title="Ad video"
-            />
-          </div>
-          <div className="mt-2 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={shuffleAd}
-              className="text-xs px-3 py-1.5 rounded border border-royalGold/30 text-textLight/80 hover:bg-royalGold/10"
-            >
-              Shuffle
-            </button>
-            <a
-              href={selectedAd?.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-royalGold hover:text-textGold"
-            >
-              Open on YouTube
-            </a>
-          </div>
+          <YouTubeVideoPlayer
+            campaign={selectedCampaign}
+            onComplete={handleVideoComplete}
+            onError={handleVideoError}
+          />
+          
+          {/* Campaign Navigation */}
+          {campaigns.length > 1 && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedIndex((prev) => (prev === 0 ? campaigns.length - 1 : prev - 1))}
+                className="text-xs px-3 py-1.5 rounded border border-royalGold/30 text-textLight/80 hover:bg-royalGold/10"
+              >
+                ← Previous
+              </button>
+              <button
+                type="button"
+                onClick={shuffleCampaign}
+                className="text-xs px-3 py-1.5 rounded border border-royalGold/30 text-textLight/80 hover:bg-royalGold/10"
+              >
+                🎲 Random
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIndex((prev) => (prev === campaigns.length - 1 ? 0 : prev + 1))}
+                className="text-xs px-3 py-1.5 rounded border border-royalGold/30 text-textLight/80 hover:bg-royalGold/10"
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="mb-4 p-4 text-sm text-textLight/60 bg-deepLapis/40 rounded border border-royalGold/20">
-          {info || 'No valid YouTube ads to show yet.'}
+          {info || 'No video campaigns available. Admins can create video campaigns to display here.'}
         </div>
       )}
 
-
+      {/* Global Reward Notification */}
+      {showRewardNotification && lastReward && (
+        <div className="mb-3 p-3 bg-emeraldGreen/10 border border-emeraldGreen/30 rounded animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🎉</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-emeraldGreen">Reward Claimed!</p>
+              <p className="text-xs text-textLight/80">
+                +{lastReward.reward} Golden Credits from "{lastReward.campaignName}"
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="mt-4 flex items-center justify-between">
         <button
           type="button"
-          onClick={loadAds}
+          onClick={loadCampaigns}
           className="text-xs px-3 py-1.5 rounded border border-royalGold/30 text-textLight/80 hover:bg-royalGold/10"
         >
           Refresh
         </button>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => syncLocalToSupabaseIfNeeded(ads).then(() => loadAds())}
-            className="text-[11px] px-2 py-1 rounded border border-royalGold/30 text-textLight/70 hover:bg-royalGold/10"
-            title="Sync local links to cloud"
-          >
-            Sync
-          </button>
-          <div className="text-[11px] text-textLight/50">
-            Data source: {isSupabaseAvailable() && backendEnabled ? 'Supabase' : 'Local'}
-          </div>
-        </div>
+        <div className="text-[11px] text-textLight/50">Data source: Database</div>
       </div>
     </div>
   );

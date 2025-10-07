@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../utils/supabase';
 import { FiPlus, FiEdit2, FiSave, FiX, FiRefreshCw } from 'react-icons/fi';
-import { loadAllUsers, createRealUser, updateUserPoints } from '../../utils/userManager';
+import { loadAllUsers, createRealUser, updateUserPoints, createTestUser } from '../../utils/userManager';
+import { isSupabaseAvailable } from '../../utils/supabase';
 import { notifyListeners, refreshUserData } from '../../utils/adminDataService';
 
 const UserManagement = () => {
@@ -371,7 +372,38 @@ const UserManagement = () => {
         ) : error ? (
           <div className="p-6 text-center text-rubyRed">{error}</div>
         ) : users.length === 0 ? (
-          <div className="p-6 text-center text-textLight">No users found.</div>
+          <div className="p-6 text-center text-textLight">
+            <div className="mb-4">No users found.</div>
+            <div className="text-sm text-textLight/70 mb-4">
+              {!isSupabaseAvailable() ?
+                "Supabase is not configured. Please set up your environment variables." :
+                "No users in database. Try adding a user or check your database connection."
+              }
+            </div>
+            <button
+              onClick={async () => {
+                // Create some test users for development
+                const testUsers = [
+                  { username: 'alice', points: 1500, role: 'user' },
+                  { username: 'bob', points: 1200, role: 'user' },
+                  { username: 'charlie', points: 800, role: 'moderator' },
+                  { username: 'admin', points: 2500, role: 'admin' }
+                ];
+
+                for (const userData of testUsers) {
+                  try {
+                    await createTestUser(userData);
+                  } catch (err) {
+                    console.error('Error creating test user:', err);
+                  }
+                }
+                fetchUsers(); // Refresh the list
+              }}
+              className="px-4 py-2 bg-royalGold text-deepLapisDark font-semibold rounded hover:bg-royalGoldLight transition-colors"
+            >
+              Create Test Users
+            </button>
+          </div>
         ) : (
           <table className="w-full text-sm text-left text-textLight/90">
             <thead className="text-xs text-textGold uppercase bg-deepLapisLight/30">
@@ -386,8 +418,8 @@ const UserManagement = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr key={user.id} className="bg-deepLapisDark hover:bg-deepLapisLight/20 border-b border-royalGold/10">
+              {users.map((user, index) => (
+                <tr key={user.id || `user-${index}`} className="bg-deepLapisDark hover:bg-deepLapisLight/20 border-b border-royalGold/10">
                   <td className="px-6 py-4 font-medium whitespace-nowrap">
                     <div className="text-base text-textGold">{user.username || 'N/A'}</div>
                     <div className="text-xs text-textLight/70">{user.email || 'N/A'}</div>

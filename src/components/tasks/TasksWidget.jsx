@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTasks } from '../../contexts/TasksContext';
-import { useWallet } from '../../contexts/WalletContext';
 import TaskList from './TaskList';
 import { toast } from 'react-hot-toast';
 
@@ -9,7 +8,6 @@ import { toast } from 'react-hot-toast';
 // Assumes TasksProvider is mounted at app root (it is, in App.jsx)
 const TasksWidget = ({ maxItems = 3, className = '' }) => {
   const { state, tasksManager, verifyTask } = useTasks();
-  const { addTransaction } = useWallet();
   const navigate = useNavigate();
 
   const normalizeTargetGameSlug = (id) => {
@@ -291,18 +289,7 @@ const TasksWidget = ({ maxItems = 3, className = '' }) => {
 
   const handleClaim = async (taskId) => {
     try {
-      const ok = await tasksManager.claimTaskReward(taskId, false);
-      if (ok && Array.isArray(state.tasks)) {
-        const task = state.tasks.find(t => t.id === taskId);
-        if (task && Array.isArray(task.rewards)) {
-          const coinReward = task.rewards
-            .filter(r => (r.type || '').toUpperCase() === 'MYSTIC_COINS')
-            .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-          if (coinReward > 0) {
-            addTransaction(coinReward, 'task_reward', task.title || 'Task reward claimed');
-          }
-        }
-      }
+      await tasksManager.claimTaskReward(taskId, false);
     } catch (e) {
       console.error('TasksWidget: failed to claim reward', e);
     }

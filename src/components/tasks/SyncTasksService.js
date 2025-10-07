@@ -204,31 +204,51 @@ export class SyncTasksService {
       if (activeTasks.length > 0) {
         localStorage.setItem('emergency_tasks', JSON.stringify(activeTasks));
         
-        // Format tasks for the application, handling different possible schemas
-        const formattedTasks = activeTasks.map(task => ({
-          id: task.id?.toString() || Math.random().toString(36).substring(2, 9),
-          title: task.title || task.name || 'Mystery Task',
-          description: task.description || task.desc || 'Complete this task to earn rewards',
-          type: task.type || task.task_type || 'DAILY_LOGIN', 
-          // Ensure we also consider game_identifier as a fallback to support navigation
-          targetGame: task.target_game || task.targetGame || task.game_identifier || null,
-          // Preserve the raw identifier as well for consumers that rely on it
-          game_identifier: task.game_identifier || task.gameIdentifier || '',
-          // Include the link field for task navigation
-          link: task.link || null,
-          requirement: parseInt(task.requirement || task.req || 1, 10),
-          progress: parseInt(task.progress || 0, 10),
-          completed: task.completed === true,
-          claimed: task.claimed === true,
-          adBoostAvailable: task.ad_boost_available !== false,
-          expiresAt: task.expires_at || task.expiresAt || new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
-          rewards: [
-            {
-              type: 'MYSTIC_COINS',
-              amount: parseFloat(task.reward || task.rewards || 10)
-            }
-          ]
-        }));
+        // Load existing local tasks to preserve client-side progress/completion
+        const existingLocal = this.storageManager.loadData('gg_tasks');
+        const localMap = {};
+        if (existingLocal && Array.isArray(existingLocal.tasks)) {
+          for (const t of existingLocal.tasks) {
+            localMap[t.id] = t;
+          }
+        }
+
+        // Format tasks for the application, handling different possible schemas.
+        // Merge with local state to avoid losing verified/completed status when server lags.
+        const formattedTasks = activeTasks.map(task => {
+          const id = task.id?.toString() || Math.random().toString(36).substring(2, 9);
+          const local = localMap[id];
+          const requirement = parseInt(task.requirement || task.req || 1, 10);
+          const serverProgress = parseInt(task.progress || 0, 10);
+          const mergedProgress = Math.max(local?.progress || 0, serverProgress);
+          const serverCompleted = task.completed === true || (mergedProgress >= requirement);
+          const mergedCompleted = (local?.completed === true) || serverCompleted;
+          const mergedClaimed = (local?.claimed === true) || (task.claimed === true);
+          return {
+            id,
+            title: task.title || task.name || 'Mystery Task',
+            description: task.description || task.desc || 'Complete this task to earn rewards',
+            type: task.type || task.task_type || 'DAILY_LOGIN', 
+            // Ensure we also consider game_identifier as a fallback to support navigation
+            targetGame: task.target_game || task.targetGame || task.game_identifier || null,
+            // Preserve the raw identifier as well for consumers that rely on it
+            game_identifier: task.game_identifier || task.gameIdentifier || '',
+            // Include the link field for task navigation
+            link: task.link || null,
+            requirement,
+            progress: mergedProgress,
+            completed: mergedCompleted,
+            claimed: mergedClaimed,
+            adBoostAvailable: (local?.adBoostAvailable != null) ? local.adBoostAvailable : (task.ad_boost_available !== false),
+            expiresAt: task.expires_at || task.expiresAt || new Date(new Date().setHours(23, 59, 59, 999)).toISOString(),
+            rewards: [
+              {
+                type: 'MYSTIC_COINS',
+                amount: parseFloat(task.reward || task.rewards || 10)
+              }
+            ]
+          };
+        });
         
         console.log('Formatted tasks for application:', formattedTasks);
         

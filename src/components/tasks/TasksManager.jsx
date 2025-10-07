@@ -543,11 +543,15 @@ export class TasksManager {
         const numericId = (() => { try { return parseInt(t.id, 10); } catch (_) { return null; } })();
         const row = numericId != null ? map[numericId] : undefined;
         if (row) {
-          const newProgress = typeof row.progress === 'number' ? row.progress : (t.progress || 0);
-          const newCompleted = row.completed || (newProgress >= (t.requirement || 1));
+          // Merge server progress with local progress to avoid regressions
+          const serverProgress = (typeof row.progress === 'number' ? row.progress : 0);
+          const newProgress = Math.max(t.progress || 0, serverProgress);
+          // Do not let server overwrite a locally completed task to incomplete
+          const serverCompleted = !!row.completed || (newProgress >= (t.requirement || 1));
+          const newCompleted = (t.completed === true) || serverCompleted;
           // Preserve local claimed state - don't overwrite with server data
           // This ensures that recently claimed rewards persist across page refreshes
-          const newClaimed = t.claimed || row.claimed;
+          const newClaimed = (t.claimed === true) || !!row.claimed;
           if (newProgress !== t.progress || newCompleted !== t.completed || newClaimed !== t.claimed) {
             t.progress = newProgress;
             t.completed = newCompleted;

@@ -13,6 +13,13 @@ const QuestionManagement = () => {
     category: '',
     explanation: ''
   });
+
+  // Ensure correct_answer is always a number and within bounds
+  const safeCorrectAnswer = typeof newQuestion.correct_answer === 'number' &&
+                           newQuestion.correct_answer >= 0 &&
+                           newQuestion.correct_answer < newQuestion.options.length
+                           ? newQuestion.correct_answer
+                           : 0;
   const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
@@ -53,10 +60,7 @@ const QuestionManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const optionsLength = Array.isArray(newQuestion.options) ? newQuestion.options.length : 0;
-      const parsedIdx = typeof newQuestion.correct_answer === 'number' ? newQuestion.correct_answer : parseInt(newQuestion.correct_answer, 10);
-      const normalizedIdx = Number.isFinite(parsedIdx) && parsedIdx >= 0 && parsedIdx < optionsLength ? parsedIdx : 0;
-      const payload = { ...newQuestion, correct_answer: normalizedIdx };
+      const payload = { ...newQuestion, correct_answer: safeCorrectAnswer };
       if (editingId) {
         const { error } = await supabase
           .from('gates_questions')
@@ -179,7 +183,7 @@ const QuestionManagement = () => {
                   type="radio"
                   id={`correct-${index}`}
                   name="correct_answer"
-                  checked={newQuestion.correct_answer === index}
+                  checked={safeCorrectAnswer === index}
                   onChange={() => setNewQuestion(prev => ({ ...prev, correct_answer: index }))}
                   className="mr-2"
                 />

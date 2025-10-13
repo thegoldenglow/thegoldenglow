@@ -10,6 +10,8 @@ import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
+// Optional local override to handle encoding issues or local-only secrets
+dotenv.config({ path: '.env.local', override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -38,8 +40,8 @@ app.post('/api/validate-telegram-auth', async (req, res) => {
       });
     }
 
-    // Get bot token from environment variables
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    // Get bot token from environment variables (fallback to VITE_ for local dev)
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
     
     if (!botToken) {
       console.error('TELEGRAM_BOT_TOKEN not configured');
@@ -169,8 +171,8 @@ app.post('/api/verify-telegram-membership', async (req, res) => {
       });
     }
 
-    // Get bot token from environment variables
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    // Get bot token from environment variables (fallback to VITE_ for local dev)
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
     
     if (!botToken) {
       console.error('TELEGRAM_BOT_TOKEN not configured');
@@ -263,7 +265,7 @@ app.post('/telegram/webhook', async (req, res) => {
       }
     }
 
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
     if (!botToken) {
       console.error('TELEGRAM_BOT_TOKEN not configured for webhook');
       return res.sendStatus(200);
@@ -563,12 +565,13 @@ tryPort(initialPort).catch(err => {
 });
 
 // Launch Telegram bot if token is configured
-if (process.env.TELEGRAM_BOT_TOKEN) {
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
+if (BOT_TOKEN) {
   bot.launch()
     .then(() => console.log('Telegram bot launched via long polling'))
     .catch((err) => console.error('Failed to launch Telegram bot:', err));
 } else {
-  console.warn('Skipping Telegram bot launch: TELEGRAM_BOT_TOKEN is not set');
+  console.warn('Skipping Telegram bot launch: neither TELEGRAM_BOT_TOKEN nor VITE_TELEGRAM_BOT_TOKEN is set');
 }
 
 // Graceful shutdown for bot

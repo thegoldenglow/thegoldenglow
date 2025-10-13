@@ -14,6 +14,7 @@
     "migrate": "node scripts/run-migration.js",
     "start": "node server.js",
     "bot:poll": "node scripts/telegram-polling-runner.mjs",
+    "bot:test": "node scripts/test-telegram-bot.mjs",
     "test": "vitest run --environment=jsdom"
   },
   "dependencies": {
@@ -49,6 +50,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "swiper": "^11.2.8",
+    "telegraf": "^4.16.3",
     "uuid": "9.0.1",
     "wagmi": "^2.15.4"
   },

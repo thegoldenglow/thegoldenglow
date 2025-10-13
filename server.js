@@ -5,7 +5,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import { validateTelegramInitData } from './src/utils/telegramValidation.js';
 import fetch from 'node-fetch';
-import dotenv from 'dotenv';
+import bot from './src/bot.js';
 
 // Load environment variables
 dotenv.config();
@@ -560,3 +560,5 @@ const initialPort = process.env.PORT || 3001;
 tryPort(initialPort).catch(err => {
   console.error('Failed to start server:', err);
 });
+
+bot.launch();

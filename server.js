@@ -6,6 +6,7 @@ import { Server } from 'socket.io';
 import { validateTelegramInitData } from './src/utils/telegramValidation.js';
 import fetch from 'node-fetch';
 import bot from './src/bot.js';
+import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
@@ -561,4 +562,19 @@ tryPort(initialPort).catch(err => {
   console.error('Failed to start server:', err);
 });
 
-bot.launch();
+// Launch Telegram bot if token is configured
+if (process.env.TELEGRAM_BOT_TOKEN) {
+  bot.launch()
+    .then(() => console.log('Telegram bot launched via long polling'))
+    .catch((err) => console.error('Failed to launch Telegram bot:', err));
+} else {
+  console.warn('Skipping Telegram bot launch: TELEGRAM_BOT_TOKEN is not set');
+}
+
+// Graceful shutdown for bot
+process.once('SIGINT', () => {
+  try { bot.stop('SIGINT'); } catch {}
+});
+process.once('SIGTERM', () => {
+  try { bot.stop('SIGTERM'); } catch {}
+});

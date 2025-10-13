@@ -249,6 +249,60 @@ app.post('/api/verify-telegram-membership', async (req, res) => {
   }
 });
 
+// Telegram webhook endpoint
+app.post('/telegram/webhook', async (req, res) => {
+  try {
+    // Optional secret verification when set via setWebhook?secret_token=...
+    const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (expectedSecret) {
+      const got = req.get('X-Telegram-Bot-Api-Secret-Token');
+      if (got !== expectedSecret) {
+        console.warn('Rejected Telegram webhook: invalid secret token');
+        return res.sendStatus(401);
+      }
+    }
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+      console.error('TELEGRAM_BOT_TOKEN not configured for webhook');
+      return res.sendStatus(200);
+    }
+
+    const update = req.body || {};
+    const message = update.message;
+
+    if (message?.text) {
+      const text = message.text;
+      const chatId = message.chat.id;
+
+      if (typeof text === 'string' && text.startsWith('/start')) {
+        const payload = text.split(' ').slice(1).join(' ') || '';
+        const replyText = 'Welcome to Golden Glow! Follow our official channel for updates and rewards:';
+        const replyMarkup = {
+          inline_keyboard: [
+            [{ text: 'Follow Golden Glow', url: 'https://t.me/GoldenGlowGlobal' }]
+          ]
+        };
+
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: replyText,
+            parse_mode: 'HTML',
+            reply_markup: replyMarkup
+          })
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Telegram webhook handler error:', err);
+  }
+  // Always respond 200 to acknowledge the update
+  return res.sendStatus(200);
+});
+
 // In-memory store for game rooms
 // Structure: { roomId: { players: { socketId: symbol }, board: [...], turn: 'X', gameOver: false, winner: null } }
 const gameRooms = {};

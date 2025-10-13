@@ -21,6 +21,12 @@
   force = true
 
 [[redirects]]
+  from = "/telegram/set-webhook"
+  to = "/.netlify/functions/telegram-set-webhook"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/verify-telegram-membership"
   to = "/.netlify/functions/verify-telegram-membership"
   status = 200

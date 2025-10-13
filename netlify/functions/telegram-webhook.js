@@ -1,5 +1,3 @@
-import bot from '../../src/bot.js';
-
 export const handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') {
@@ -14,6 +12,13 @@ export const handler = async (event) => {
     console.log('Webhook update type:', update?.message?.text ? 'message' : Object.keys(update || {}));
     console.log('From user:', update?.message?.from?.id, update?.message?.from?.username);
 
+    const token = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      console.error('Missing TELEGRAM_BOT_TOKEN in Netlify environment');
+      return { statusCode: 200, body: JSON.stringify({ ok: false, error: 'Missing bot token' }) };
+    }
+
+    const { default: bot } = await import('../../src/bot.js');
     await bot.handleUpdate(update);
 
     return { statusCode: 200, body: 'OK' };

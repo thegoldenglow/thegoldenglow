@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "migrate": "node scripts/run-migration.js",
     "start": "node server.js",
+    "bot:poll": "node scripts/telegram-polling-runner.mjs",
     "test": "vitest run --environment=jsdom"
   },
   "dependencies": {

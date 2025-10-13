@@ -7,6 +7,10 @@ dotenv.config();
 dotenv.config({ path: '.env.local', override: true });
 
 const token = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
+// Allow bypassing membership check when Telegram restricts member list access
+const SKIP_MEMBERSHIP_CHECK =
+  (process.env.TELEGRAM_SKIP_MEMBERSHIP_CHECK === 'true') ||
+  (process.env.VITE_TELEGRAM_SKIP_MEMBERSHIP_CHECK === 'true');
 const bot = new Telegraf(token);
 
 // Required channel to join before playing
@@ -36,6 +40,9 @@ async function resolveChannelId(telegram) {
 // Helper: check if a user is a member of the required channel
 async function checkRequiredChannelMember(telegram, userId) {
   try {
+    if (SKIP_MEMBERSHIP_CHECK) {
+      return { isMember: true, error: null };
+    }
     const chatId = (await resolveChannelId(telegram)) || REQUIRED_CHAT;
     const res = await telegram.getChatMember(chatId, userId);
     const status = res?.status; // 'creator','administrator','member','restricted','left','kicked'
@@ -44,6 +51,10 @@ async function checkRequiredChannelMember(telegram, userId) {
   } catch (err) {
     console.error('Membership check error:', err);
     const apiError = err?.response?.description || err?.message || 'Unknown error';
+    // If skip is enabled, treat as member to avoid blocking gameplay
+    if (SKIP_MEMBERSHIP_CHECK) {
+      return { isMember: true, error: apiError };
+    }
     return { isMember: false, error: apiError };
   }
 }

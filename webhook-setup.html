@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golden Glow - Webhook Setup</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #fff;
+        }
+        .button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 15px 0;
+            background: linear-gradient(45deg, #FF6B6B, #FF8E53);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        .button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            display: none;
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.3);
+            border: 1px solid #4CAF50;
+        }
+        .error {
+            background: rgba(244, 67, 54, 0.3);
+            border: 1px solid #F44336;
+        }
+        .info {
+            background: rgba(33, 150, 243, 0.3);
+            border: 1px solid #2196F3;
+        }
+        pre {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌟 Golden Glow - Webhook Setup</h1>
+        
+        <button class="button" id="setWebhook">Set Final Clean Webhook</button>
+        <button class="button" id="checkWebhook">Check Current Webhook</button>
+        <button class="button" id="deleteWebhook">Delete Webhook</button>
+        
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const setWebhookBtn = document.getElementById('setWebhook');
+        const checkWebhookBtn = document.getElementById('checkWebhook');
+        const deleteWebhookBtn = document.getElementById('deleteWebhook');
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+
+        function showJsonStatus(data, type) {
+            statusDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+
+        async function setWebhook() {
+            setWebhookBtn.disabled = true;
+            showStatus('Setting Final Clean Webhook...', 'info');
+            
+            try {
+                const response = await fetch('/telegram/set-final-clean-webhook', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                const data = await response.json();
+                
+                if (data.result.ok) {
+                    showJsonStatus(data, 'success');
+                } else {
+                    showJsonStatus(data, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                setWebhookBtn.disabled = false;
+            }
+        }
+
+        async function checkWebhook() {
+            checkWebhookBtn.disabled = true;
+            showStatus('Checking Webhook Status...', 'info');
+            
+            try {
+                const response = await fetch('/telegram/webhook-info');
+                const data = await response.json();
+                showJsonStatus(data, 'info');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                checkWebhookBtn.disabled = false;
+            }
+        }
+
+        async function deleteWebhook() {
+            deleteWebhookBtn.disabled = true;
+            showStatus('Deleting Webhook...', 'info');
+            
+            try {
+                const response = await fetch('/telegram/set-webhook', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: '' }),
+                });
+                
+                const data = await response.json();
+                showJsonStatus(data, 'info');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                deleteWebhookBtn.disabled = false;
+            }
+        }
+
+        setWebhookBtn.addEventListener('click', setWebhook);
+        checkWebhookBtn.addEventListener('click', checkWebhook);
+        deleteWebhookBtn.addEventListener('click', deleteWebhook);
+    </script>
+</body>
+</html>

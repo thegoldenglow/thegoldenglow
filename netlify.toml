@@ -33,6 +33,18 @@
   force = true
 
 [[redirects]]
+  from = "/telegram/final-clean-webhook"
+  to = "/.netlify/functions/final-clean-webhook"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/telegram/set-final-clean-webhook"
+  to = "/.netlify/functions/set-final-clean-webhook"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

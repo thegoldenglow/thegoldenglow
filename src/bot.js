@@ -78,7 +78,7 @@ bot.catch((err, ctx) => {
   console.error('Telegram bot error:', err);
 });
 
-// /start command with deep link payload support
+// /start command with deep link payload support - FORCES channel membership
 bot.start(async (ctx) => {
   const payload = ctx.startPayload || '';
   const name = ctx.from?.first_name ? `, ${ctx.from.first_name}` : '';
@@ -88,34 +88,45 @@ bot.start(async (ctx) => {
 
   if (isMember) {
     const text = [
-      `Welcome to The Golden Glow${name}! ✨`,
-      'You are subscribed to our official channel. You can play the game now.',
-      payload ? `Deep link payload: ${payload}` : ''
+      `🌟 Welcome to The Golden Glow${name}! ✨`,
+      '🎮 You are subscribed to our official channel and can now play the game!',
+      'Tap the button below to start playing:',
+      payload ? `Your referral code: ${payload}` : ''
     ].filter(Boolean).join('\n\n');
 
     await ctx.reply(text, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: 'Follow Golden Glow', url: CHANNEL_URL }]
+          [{ text: '🎮 Play Golden Glow', web_app: { url: 'https://lambent-pithivier-68ddb6.netlify.app' } }],
+          [{ text: '📢 Visit Channel', url: CHANNEL_URL }]
         ]
       }
     });
   } else {
+    // BLOCK access completely until they join
     const text = [
-      `Welcome to The Golden Glow${name}! ✨`,
-      'To play, please follow our official channel first:',
-      CHANNEL_URL,
-      'After joining, tap “I\'ve joined ✅” below to unlock the game.',
+      `🌟 Welcome to The Golden Glow${name}!`,
+      '',
+      '⚠️ *ACCESS RESTRICTED* ⚠️',
+      '',
+      '📢 You MUST join our official channel first:',
+      `🔗 ${CHANNEL_URL}`,
+      '',
+      '👉 *Step 1:* Click the "Join Channel" button below',
+      '👉 *Step 2:* After joining, click "Check Access"',
+      '',
+      '❌ You cannot use this bot until you join the channel.',
       error?.includes('member list is inaccessible')
-        ? 'Note: Verification requires the bot to be an admin of the channel. Please add @TheGoldenGlow_bot as an admin in @GoldenGlowGlobal and try again.'
+        ? '⚠️ Note: Please add @TheGoldenGlow_bot as an admin in @GoldenGlowGlobal for verification to work properly.'
         : ''
-    ].join('\n\n');
+    ].filter(Boolean).join('\n');
 
     await ctx.reply(text, {
+      parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: 'Follow Golden Glow', url: CHANNEL_URL }],
-          [{ text: "I've joined ✅", callback_data: 'check_membership' }]
+          [{ text: '📢 Join Channel', url: CHANNEL_URL }],
+          [{ text: '🔍 Check Access', callback_data: 'force_check_membership' }]
         ]
       }
     });
@@ -135,7 +146,7 @@ bot.action('check_membership', async (ctx) => {
       );
     } else {
       const message = [
-        'Still not detected as a member yet. Please ensure you joined the channel, then tap “I\'ve joined ✅” again.',
+        'Still not detected as a member yet. Please ensure you joined the channel, then tap "I\'ve joined ✅" again.',
         error?.includes('member list is inaccessible')
           ? 'Verification requires the bot to be an admin of the channel. Please add @TheGoldenGlow_bot as an admin in @GoldenGlowGlobal and try again.'
           : ''
@@ -152,6 +163,61 @@ bot.action('check_membership', async (ctx) => {
     }
   } catch (err) {
     console.error('check_membership error:', err);
+    await ctx.reply('Error checking membership. Please try again.');
+  }
+});
+
+// Forceful membership check for users who haven't joined
+bot.action('force_check_membership', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    const userId = ctx.from?.id;
+    const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
+
+    if (isMember) {
+      const text = [
+        '🎉 *ACCESS GRANTED!* 🎉',
+        '',
+        'Welcome to The Golden Glow! You are now subscribed to our channel.',
+        'Tap the button below to start playing:'
+      ].join('\n');
+
+      await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🎮 Play Golden Glow', web_app: { url: 'https://lambent-pithivier-68ddb6.netlify.app' } }],
+            [{ text: '📢 Visit Channel', url: CHANNEL_URL }]
+          ]
+        }
+      });
+    } else {
+      const message = [
+        '❌ *ACCESS DENIED* ❌',
+        '',
+        'You are still not a member of our channel.',
+        '',
+        '📢 *REQUIRED:* Join our official channel first:',
+        `🔗 ${CHANNEL_URL}`,
+        '',
+        '👉 Click "Join Channel" below, then come back and tap "Check Access" again.',
+        error?.includes('member list is inaccessible')
+          ? '⚠️ Note: Please add @TheGoldenGlow_bot as an admin in @GoldenGlowGlobal for verification to work properly.'
+          : ''
+      ].filter(Boolean).join('\n');
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📢 Join Channel', url: CHANNEL_URL }],
+            [{ text: '🔍 Check Access', callback_data: 'force_check_membership' }]
+          ]
+        }
+      });
+    }
+  } catch (err) {
+    console.error('force_check_membership error:', err);
     await ctx.reply('Error checking membership. Please try again.');
   }
 });

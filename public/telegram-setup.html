@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telegram Bot Setup - Golden Glow</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+    }
+
+    h1 {
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+    }
+
+    .section h2 {
+      color: #333;
+      font-size: 18px;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-icon {
+      font-size: 24px;
+    }
+
+    button {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 10px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .btn-danger {
+      background: #ff6b6b;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #ff5252;
+    }
+
+    #status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      display: none;
+    }
+
+    .status-success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .status-error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .status-info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+
+    pre {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .instructions {
+      background: #fff3cd;
+      border: 1px solid #ffeeba;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    .instructions h3 {
+      color: #856404;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
+    .instructions ol {
+      margin-left: 20px;
+      color: #856404;
+    }
+
+    .instructions li {
+      margin-bottom: 8px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🤖 Telegram Bot Setup</h1>
+    <p class="subtitle">Configure your Golden Glow Telegram bot for Netlify deployment</p>
+
+    <div class="instructions">
+      <h3>📋 Setup Instructions:</h3>
+      <ol>
+        <li>Make sure you've deployed your site to Netlify</li>
+        <li>Add <code>TELEGRAM_BOT_TOKEN</code> to your Netlify environment variables</li>
+        <li>Click "Set Bot Webhook" below to configure the bot</li>
+        <li>Test your bot by sending /start on Telegram</li>
+      </ol>
+    </div>
+
+    <div class="section">
+      <h2><span class="section-icon">🔧</span>Webhook Setup</h2>
+      <button class="btn-primary" onclick="setWebhook()">
+        Set Bot Webhook
+      </button>
+      <button class="btn-secondary" onclick="checkWebhook()">
+        Check Current Webhook
+      </button>
+      <button class="btn-danger" onclick="deleteWebhook()">
+        Delete Webhook
+      </button>
+    </div>
+
+    <div class="section">
+      <h2><span class="section-icon">🧪</span>Testing</h2>
+      <button class="btn-secondary" onclick="getMe()">
+        Test Bot Token
+      </button>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const statusDiv = document.getElementById('status');
+
+    function showStatus(message, type, details = null) {
+      statusDiv.innerHTML = message;
+      if (details) {
+        statusDiv.innerHTML += '<pre>' + JSON.stringify(details, null, 2) + '</pre>';
+      }
+      statusDiv.className = 'status-' + type;
+      statusDiv.style.display = 'block';
+    }
+
+    function setButtonLoading(button, loading) {
+      if (loading) {
+        button.innerHTML = '<span class="spinner"></span> Processing...';
+        button.classList.add('loading');
+      } else {
+        button.classList.remove('loading');
+      }
+    }
+
+    async function setWebhook() {
+      const button = event.target;
+      setButtonLoading(button, true);
+      
+      try {
+        const response = await fetch('/telegram/set-bot-webhook', {
+          method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          showStatus('✅ ' + data.message, 'success', data);
+          button.innerHTML = 'Set Bot Webhook';
+        } else {
+          showStatus('❌ Failed to set webhook', 'error', data);
+          button.innerHTML = 'Set Bot Webhook';
+        }
+      } catch (error) {
+        showStatus('❌ Error: ' + error.message, 'error');
+        button.innerHTML = 'Set Bot Webhook';
+      }
+    }
+
+    async function checkWebhook() {
+      const button = event.target;
+      setButtonLoading(button, true);
+      
+      try {
+        const response = await fetch('/telegram/webhook-info', {
+          method: 'POST'
+        });
+        const data = await response.json();
+        
+        showStatus('ℹ️ Webhook Information', 'info', data);
+        button.innerHTML = 'Check Current Webhook';
+      } catch (error) {
+        showStatus('❌ Error: ' + error.message, 'error');
+        button.innerHTML = 'Check Current Webhook';
+      }
+    }
+
+    async function deleteWebhook() {
+      if (!confirm('Are you sure you want to delete the webhook?')) {
+        return;
+      }
+
+      const button = event.target;
+      setButtonLoading(button, true);
+      
+      try {
+        const response = await fetch('https://api.telegram.org/bot' + 'YOUR_TOKEN' + '/deleteWebhook', {
+          method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.ok) {
+          showStatus('✅ Webhook deleted successfully', 'success', data);
+        } else {
+          showStatus('❌ Failed to delete webhook', 'error', data);
+        }
+        button.innerHTML = 'Delete Webhook';
+      } catch (error) {
+        showStatus('❌ Note: Use Telegram API directly or contact admin to delete webhook', 'error');
+        button.innerHTML = 'Delete Webhook';
+      }
+    }
+
+    async function getMe() {
+      const button = event.target;
+      setButtonLoading(button, true);
+      
+      try {
+        // This would need a backend endpoint to work securely
+        showStatus('ℹ️ To test the bot token, check your Netlify function logs or use the Telegram Bot API directly.', 'info');
+        button.innerHTML = 'Test Bot Token';
+      } catch (error) {
+        showStatus('❌ Error: ' + error.message, 'error');
+        button.innerHTML = 'Test Bot Token';
+      }
+    }
+  </script>
+</body>
+</html>

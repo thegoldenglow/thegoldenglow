@@ -45,6 +45,18 @@
   force = true
 
 [[redirects]]
+  from = "/telegram/bot-webhook"
+  to = "/.netlify/functions/telegram-bot-webhook"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/telegram/set-bot-webhook"
+  to = "/.netlify/functions/set-bot-webhook"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

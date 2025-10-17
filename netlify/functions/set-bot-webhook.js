@@ -1,3 +1,5 @@
+import fetch from 'node-fetch';
+
 export const handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') {

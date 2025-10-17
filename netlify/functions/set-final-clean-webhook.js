@@ -1,3 +1,5 @@
+import fetch from 'node-fetch';
+
 export const handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') {
@@ -14,33 +16,15 @@ export const handler = async (event) => {
     const host = event.headers.host;
     const targetUrl = `${proto}://${host}/.netlify/functions/final-clean-webhook`;
 
-    const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(targetUrl)}&drop_pending_updates=true`);
+    const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(targetUrl)}`);
     const data = await res.json();
-    
-    // Also set bot commands
-    if (data.ok) {
-      await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          commands: [
-            { command: 'start', description: 'Start Golden Glow' },
-            { command: 'help', description: 'How to play & commands' },
-            { command: 'play', description: 'Launch the game' },
-          ]
-        })
-      });
-    }
     
     return { 
       statusCode: 200, 
       body: JSON.stringify({ 
-        success: data.ok,
-        webhook_url: targetUrl, 
+        requested_url: targetUrl, 
         result: data,
-        message: data.ok 
-          ? "✅ Telegram bot webhook set successfully!" 
-          : "❌ Failed to set webhook"
+        message: "Final Clean Webhook Set - No Backup Channel Messages!"
       }) 
     };
   } catch (err) {

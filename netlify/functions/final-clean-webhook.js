@@ -1,4 +1,6 @@
 // FINAL CLEAN WEBHOOK - No backup channel messages
+import fetch from 'node-fetch';
+
 // Clean messages - no backup channel requirements
 const FINAL_MESSAGES = {
   start: `🌟 <b>Welcome to Golden Glow!</b>

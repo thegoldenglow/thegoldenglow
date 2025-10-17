@@ -46,13 +46,13 @@
 
 [[redirects]]
   from = "/telegram/bot-webhook"
-  to = "/.netlify/functions/telegram-bot-webhook"
+  to = "/.netlify/functions/final-clean-webhook"
   status = 200
   force = true
 
 [[redirects]]
   from = "/telegram/set-bot-webhook"
-  to = "/.netlify/functions/set-bot-webhook"
+  to = "/.netlify/functions/set-final-clean-webhook"
   status = 200
   force = true
 

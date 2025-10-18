@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+// Use native fetch API (available in Node.js 18+)
 
 export const handler = async (event) => {
   try {

@@ -1,4 +1,4 @@
-// Use native fetch API (available in Node.js 18+)
+import fetch from 'node-fetch';
 
 export const handler = async (event) => {
   try {

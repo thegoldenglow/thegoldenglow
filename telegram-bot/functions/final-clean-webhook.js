@@ -1,5 +1,5 @@
 // FINAL CLEAN WEBHOOK - With channel membership verification
-// Use native fetch API (available in Node.js 18+)
+import fetch from 'node-fetch';
 
 // Configuration
 const REQUIRED_CHANNEL = process.env.TELEGRAM_REQUIRED_CHANNEL || '@GoldenGlowGlobal';
@@ -221,7 +221,7 @@ export const handler = async (event) => {
 
     const token = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
     if (!token) {
-      console.error('Missing TELEGRAM_BOT_TOKEN in Netlify environment');
+      console.error('Missing TELEGRAM_BOT_TOKEN in environment');
       return { statusCode: 200, body: JSON.stringify({ ok: false, error: 'Missing bot token' }) };
     }
 

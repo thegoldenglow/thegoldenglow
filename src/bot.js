@@ -65,48 +65,34 @@ async function checkRequiredChannelMember(telegram, userId) {
 }
 
 // Helper: Set menu button to Web App (enable access)
-async function enableMenuButton(telegram, userId) {
+async function enableMenuButton(telegram, chatId) {
   try {
-    // First, reset to default to force a refresh
     await telegram.setChatMenuButton({
-      chat_id: userId,
-      menu_button: { type: 'default' }
-    });
-    
-    // Small delay to ensure the change is processed
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Then set the Web App button
-    await telegram.setChatMenuButton({
-      chat_id: userId,
+      chat_id: chatId,
       menu_button: {
         type: 'web_app',
-        text: '🎮 Golden Glow',
+        text: 'Play Golden Glow',
         web_app: { url: WEB_APP_URL }
       }
     });
-    console.log(`Menu button enabled for user ${userId}`);
-    return true;
+    console.log(`Menu button enabled for user ${chatId}`);
   } catch (err) {
-    console.error('Error enabling menu button:', err?.response?.description || err?.message || err);
-    return false;
+    console.error('Error enabling menu button:', err);
   }
 }
 
 // Helper: Set menu button to default/commands (disable access)
-async function disableMenuButton(telegram, userId) {
+async function disableMenuButton(telegram, chatId) {
   try {
     await telegram.setChatMenuButton({
-      chat_id: userId,
+      chat_id: chatId,
       menu_button: {
-        type: 'default'
+        type: 'commands'
       }
     });
-    console.log(`Menu button disabled for user ${userId}`);
-    return true;
+    console.log(`Menu button disabled for user ${chatId}`);
   } catch (err) {
-    console.error('Error disabling menu button:', err?.response?.description || err?.message || err);
-    return false;
+    console.error('Error disabling menu button:', err);
   }
 }
 
@@ -134,12 +120,13 @@ bot.start(async (ctx) => {
   const payload = ctx.startPayload || '';
   const name = ctx.from?.first_name ? `, ${ctx.from.first_name}` : '';
   const userId = ctx.from?.id;
+  const chatId = ctx.chat?.id;
 
   const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
 
   // Disable the menu button for non-members
-  if (!isMember && userId) {
-    await disableMenuButton(ctx.telegram, userId);
+  if (!isMember && chatId) {
+    await disableMenuButton(ctx.telegram, chatId);
   }
 
   // Always require explicit verification via "Check Access" button
@@ -180,22 +167,15 @@ bot.start(async (ctx) => {
 // Callback to re-check membership after the user joins the channel
 bot.action('check_membership', async (ctx) => {
   try {
+    await ctx.answerCbQuery();
     const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
     const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
 
     if (isMember) {
       // Enable the menu button for verified members
-      if (userId) {
-        const enabled = await enableMenuButton(ctx.telegram, userId);
-        
-        // Send a notification to trigger UI refresh
-        if (enabled) {
-          await ctx.answerCbQuery('✅ Menu button activated! Check the bottom of your chat.', { show_alert: false });
-        } else {
-          await ctx.answerCbQuery();
-        }
-      } else {
-        await ctx.answerCbQuery();
+      if (chatId) {
+        await enableMenuButton(ctx.telegram, chatId);
       }
 
       // Show success message with Play button
@@ -203,13 +183,7 @@ bot.action('check_membership', async (ctx) => {
         '🎉 *VERIFIED!* 🎉',
         '',
         '✅ You are now subscribed to our channel.',
-        '',
-        '🎮 *Menu Button Activated!*',
-        'Look at the bottom left of your chat - you should see a "Golden Glow" button.',
-        '',
-        '_If it doesn\'t appear, try typing any message or close/reopen the chat._',
-        '',
-        'Or tap the button below to start playing now:'
+        'Tap the button below to start playing:'
       ].join('\n');
 
       await ctx.editMessageText(text, {
@@ -222,8 +196,6 @@ bot.action('check_membership', async (ctx) => {
         }
       });
     } else {
-      await ctx.answerCbQuery('❌ Not verified. Please join the channel first.', { show_alert: false });
-      
       const message = [
         '❌ Not verified yet.',
         '',
@@ -252,35 +224,22 @@ bot.action('check_membership', async (ctx) => {
 // Forceful membership check for users who haven't joined
 bot.action('force_check_membership', async (ctx) => {
   try {
+    await ctx.answerCbQuery();
     const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
     const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
 
     if (isMember) {
       // Enable the menu button for verified members
-      if (userId) {
-        const enabled = await enableMenuButton(ctx.telegram, userId);
-        
-        // Send a notification to trigger UI refresh
-        if (enabled) {
-          await ctx.answerCbQuery('✅ Menu button activated! Check the bottom of your chat.', { show_alert: false });
-        } else {
-          await ctx.answerCbQuery();
-        }
-      } else {
-        await ctx.answerCbQuery();
+      if (chatId) {
+        await enableMenuButton(ctx.telegram, chatId);
       }
 
       const text = [
         '🎉 *ACCESS GRANTED!* 🎉',
         '',
         'Welcome to The Golden Glow! You are now subscribed to our channel.',
-        '',
-        '🎮 *Menu Button Activated!*',
-        'Look at the bottom left of your chat - you should see a "Golden Glow" button.',
-        '',
-        '_If it doesn\'t appear, try typing any message or close/reopen the chat._',
-        '',
-        'Or tap the button below to start playing now:'
+        'Tap the button below to start playing:'
       ].join('\n');
 
       await ctx.editMessageText(text, {
@@ -293,7 +252,6 @@ bot.action('force_check_membership', async (ctx) => {
         }
       });
     } else {
-      await ctx.answerCbQuery('❌ Not verified. Please join the channel first.', { show_alert: false });
       const message = [
         '❌ *ACCESS DENIED* ❌',
         '',

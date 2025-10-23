@@ -15,26 +15,20 @@ async function main() {
     // Check and delete webhook before launching in polling mode
     console.log('Checking for existing webhook...');
     
+    // ALWAYS delete webhook when running locally to prevent conflicts
     try {
-      const webhookInfo = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`, {
+      console.log('🔄 Ensuring clean state for local development...');
+      const deleteResult = await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=true`, {
         signal: AbortSignal.timeout(5000) // 5 second timeout
       });
-      const webhookData = await webhookInfo.json();
+      const deleteData = await deleteResult.json();
       
-      if (webhookData.result?.url) {
-        console.log(`⚠️  Webhook detected: ${webhookData.result.url}`);
-        console.log('Deleting webhook to avoid conflicts with polling mode...');
-        const deleteResult = await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=true`);
-        const deleteData = await deleteResult.json();
-        if (deleteData.ok) {
-          console.log('✅ Webhook deleted successfully');
-          console.log('⏳ Waiting 2 seconds before launching bot...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        } else {
-          console.warn('⚠️  Failed to delete webhook:', deleteData);
-        }
+      if (deleteData.ok) {
+        console.log('✅ Webhook cleared (if any existed)');
+        console.log('⏳ Waiting 2 seconds to ensure clean state...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
       } else {
-        console.log('✅ No webhook set, proceeding with polling mode');
+        console.warn('⚠️  Could not clear webhook:', deleteData.description);
       }
     } catch (fetchErr) {
       console.warn('⚠️  Could not check webhook (network issue):', fetchErr.message);

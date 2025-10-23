@@ -19,6 +19,11 @@ const REQUIRED_CHANNEL_ID = process.env.TELEGRAM_REQUIRED_CHANNEL_ID; // e.g. -1
 const REQUIRED_CHAT = REQUIRED_CHANNEL_ID ? Number(REQUIRED_CHANNEL_ID) : REQUIRED_CHANNEL;
 const CHANNEL_URL = `https://t.me/${REQUIRED_CHANNEL.replace('@','')}`;
 
+// Web App URL for the menu button
+const WEB_APP_URL = process.env.TELEGRAM_WEB_APP_URL || 
+                    process.env.VITE_TELEGRAM_WEB_APP_URL || 
+                    'https://lambent-pithivier-68ddb6.netlify.app';
+
 // Cache for resolved numeric chat id (for reliability)
 let RESOLVED_CHAT_ID = REQUIRED_CHANNEL_ID ? Number(REQUIRED_CHANNEL_ID) : null;
 
@@ -59,6 +64,38 @@ async function checkRequiredChannelMember(telegram, userId) {
   }
 }
 
+// Helper: Set menu button to Web App (enable access)
+async function enableMenuButton(telegram, chatId) {
+  try {
+    await telegram.setChatMenuButton({
+      chat_id: chatId,
+      menu_button: {
+        type: 'web_app',
+        text: 'Play Golden Glow',
+        web_app: { url: WEB_APP_URL }
+      }
+    });
+    console.log(`Menu button enabled for user ${chatId}`);
+  } catch (err) {
+    console.error('Error enabling menu button:', err);
+  }
+}
+
+// Helper: Set menu button to default/commands (disable access)
+async function disableMenuButton(telegram, chatId) {
+  try {
+    await telegram.setChatMenuButton({
+      chat_id: chatId,
+      menu_button: {
+        type: 'commands'
+      }
+    });
+    console.log(`Menu button disabled for user ${chatId}`);
+  } catch (err) {
+    console.error('Error disabling menu button:', err);
+  }
+}
+
 // Register bot commands (shown in Telegram UI) if token exists
 if (token) {
   bot.telegram
@@ -83,8 +120,14 @@ bot.start(async (ctx) => {
   const payload = ctx.startPayload || '';
   const name = ctx.from?.first_name ? `, ${ctx.from.first_name}` : '';
   const userId = ctx.from?.id;
+  const chatId = ctx.chat?.id;
 
   const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
+
+  // Disable the menu button for non-members
+  if (!isMember && chatId) {
+    await disableMenuButton(ctx.telegram, chatId);
+  }
 
   // Always require explicit verification via "Check Access" button
   // Don't show Play button on initial /start even if already a member
@@ -126,9 +169,15 @@ bot.action('check_membership', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
     const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
 
     if (isMember) {
+      // Enable the menu button for verified members
+      if (chatId) {
+        await enableMenuButton(ctx.telegram, chatId);
+      }
+
       // Show success message with Play button
       const text = [
         '🎉 *VERIFIED!* 🎉',
@@ -141,7 +190,7 @@ bot.action('check_membership', async (ctx) => {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
-            [{ text: '🎮 Play Golden Glow', web_app: { url: 'https://lambent-pithivier-68ddb6.netlify.app' } }],
+            [{ text: '🎮 Play Golden Glow', web_app: { url: WEB_APP_URL } }],
             [{ text: '📢 Visit Channel', url: CHANNEL_URL }]
           ]
         }
@@ -177,9 +226,15 @@ bot.action('force_check_membership', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
     const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
 
     if (isMember) {
+      // Enable the menu button for verified members
+      if (chatId) {
+        await enableMenuButton(ctx.telegram, chatId);
+      }
+
       const text = [
         '🎉 *ACCESS GRANTED!* 🎉',
         '',
@@ -191,7 +246,7 @@ bot.action('force_check_membership', async (ctx) => {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
-            [{ text: '🎮 Play Golden Glow', web_app: { url: 'https://lambent-pithivier-68ddb6.netlify.app' } }],
+            [{ text: '🎮 Play Golden Glow', web_app: { url: WEB_APP_URL } }],
             [{ text: '📢 Visit Channel', url: CHANNEL_URL }]
           ]
         }

@@ -13,7 +13,9 @@ const bot = new Telegraf(token);
 const REQUIRED_CHANNEL = process.env.TELEGRAM_REQUIRED_CHANNEL || '@GoldenGlowGlobal';
 const SKIP_MEMBERSHIP_CHECK = process.env.TELEGRAM_SKIP_MEMBERSHIP_CHECK === 'true';
 const CHANNEL_URL = `https://t.me/${REQUIRED_CHANNEL.replace('@', '')}`;
-const WEB_APP_URL = process.env.VITE_APP_URL || 'https://lambent-pithivier-68ddb6.netlify.app';
+const WEB_APP_URL = process.env.TELEGRAM_WEB_APP_URL || 
+                    process.env.VITE_TELEGRAM_WEB_APP_URL || 
+                    'https://lambent-pithivier-68ddb6.netlify.app';
 
 // Helper: check if user is a member
 async function checkRequiredChannelMember(telegram, userId) {
@@ -38,13 +40,51 @@ async function checkRequiredChannelMember(telegram, userId) {
   }
 }
 
+// Helper: Set menu button to Web App (enable access)
+async function enableMenuButton(telegram, chatId) {
+  try {
+    await telegram.setChatMenuButton({
+      chat_id: chatId,
+      menu_button: {
+        type: 'web_app',
+        text: 'Play Golden Glow',
+        web_app: { url: WEB_APP_URL }
+      }
+    });
+    console.log(`Menu button enabled for user ${chatId}`);
+  } catch (err) {
+    console.error('Error enabling menu button:', err);
+  }
+}
+
+// Helper: Set menu button to default/commands (disable access)
+async function disableMenuButton(telegram, chatId) {
+  try {
+    await telegram.setChatMenuButton({
+      chat_id: chatId,
+      menu_button: {
+        type: 'commands'
+      }
+    });
+    console.log(`Menu button disabled for user ${chatId}`);
+  } catch (err) {
+    console.error('Error disabling menu button:', err);
+  }
+}
+
 // /start command
 bot.start(async (ctx) => {
   const payload = ctx.startPayload || '';
   const name = ctx.from?.first_name ? `, ${ctx.from.first_name}` : '';
   const userId = ctx.from?.id;
+  const chatId = ctx.chat?.id;
 
   const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
+
+  // Disable the menu button for non-members
+  if (!isMember && chatId) {
+    await disableMenuButton(ctx.telegram, chatId);
+  }
 
   if (isMember) {
     const text = [
@@ -97,9 +137,15 @@ bot.action('check_membership', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
     const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
 
     if (isMember) {
+      // Enable the menu button for verified members
+      if (chatId) {
+        await enableMenuButton(ctx.telegram, chatId);
+      }
+
       await ctx.editMessageText(
         '✅ Thanks for joining! You are now subscribed and can play the game. 🎮',
         {
@@ -137,9 +183,15 @@ bot.action('force_check_membership', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
     const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
 
     if (isMember) {
+      // Enable the menu button for verified members
+      if (chatId) {
+        await enableMenuButton(ctx.telegram, chatId);
+      }
+
       const text = [
         '🎉 *ACCESS GRANTED!* 🎉',
         '',

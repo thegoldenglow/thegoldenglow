@@ -5,7 +5,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import { validateTelegramInitData } from './src/utils/telegramValidation.js';
 import fetch from 'node-fetch';
-import bot from './src/bot.js';
+// bot is launched separately via scripts/run-telegraf.mjs (not imported here)
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -564,20 +564,9 @@ tryPort(initialPort).catch(err => {
   console.error('Failed to start server:', err);
 });
 
-// Launch Telegram bot if token is configured
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
-if (BOT_TOKEN) {
-  bot.launch()
-    .then(() => console.log('Telegram bot launched via long polling'))
-    .catch((err) => console.error('Failed to launch Telegram bot:', err));
-} else {
-  console.warn('Skipping Telegram bot launch: neither TELEGRAM_BOT_TOKEN nor VITE_TELEGRAM_BOT_TOKEN is set');
-}
+// NOTE: Bot is launched separately via scripts/run-telegraf.mjs
+// Do NOT launch the bot here to avoid duplicate instances
+// The bot should only run in development via npm run dev:bot
+// or in production via Netlify webhook (netlify/functions/telegram-bot-webhook.js)
 
-// Graceful shutdown for bot
-process.once('SIGINT', () => {
-  try { bot.stop('SIGINT'); } catch {}
-});
-process.once('SIGTERM', () => {
-  try { bot.stop('SIGTERM'); } catch {}
-});
+console.log('Telegram bot is managed separately (not launched from server.js)');

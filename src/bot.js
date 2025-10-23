@@ -67,6 +67,16 @@ async function checkRequiredChannelMember(telegram, userId) {
 // Helper: Set menu button to Web App (enable access)
 async function enableMenuButton(telegram, userId) {
   try {
+    // First, reset to default to force a refresh
+    await telegram.setChatMenuButton({
+      chat_id: userId,
+      menu_button: { type: 'default' }
+    });
+    
+    // Small delay to ensure the change is processed
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Then set the Web App button
     await telegram.setChatMenuButton({
       chat_id: userId,
       menu_button: {
@@ -170,14 +180,22 @@ bot.start(async (ctx) => {
 // Callback to re-check membership after the user joins the channel
 bot.action('check_membership', async (ctx) => {
   try {
-    await ctx.answerCbQuery();
     const userId = ctx.from?.id;
     const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
 
     if (isMember) {
       // Enable the menu button for verified members
       if (userId) {
-        await enableMenuButton(ctx.telegram, userId);
+        const enabled = await enableMenuButton(ctx.telegram, userId);
+        
+        // Send a notification to trigger UI refresh
+        if (enabled) {
+          await ctx.answerCbQuery('✅ Menu button activated! Check the bottom of your chat.', { show_alert: false });
+        } else {
+          await ctx.answerCbQuery();
+        }
+      } else {
+        await ctx.answerCbQuery();
       }
 
       // Show success message with Play button
@@ -187,9 +205,9 @@ bot.action('check_membership', async (ctx) => {
         '✅ You are now subscribed to our channel.',
         '',
         '🎮 *Menu Button Activated!*',
-        'The "Golden Glow" button is now available at the bottom of your chat.',
+        'Look at the bottom left of your chat - you should see a "Golden Glow" button.',
         '',
-        '_Note: If you don\'t see it, close and reopen this chat._',
+        '_If it doesn\'t appear, try typing any message or close/reopen the chat._',
         '',
         'Or tap the button below to start playing now:'
       ].join('\n');
@@ -204,6 +222,8 @@ bot.action('check_membership', async (ctx) => {
         }
       });
     } else {
+      await ctx.answerCbQuery('❌ Not verified. Please join the channel first.', { show_alert: false });
+      
       const message = [
         '❌ Not verified yet.',
         '',
@@ -232,14 +252,22 @@ bot.action('check_membership', async (ctx) => {
 // Forceful membership check for users who haven't joined
 bot.action('force_check_membership', async (ctx) => {
   try {
-    await ctx.answerCbQuery();
     const userId = ctx.from?.id;
     const { isMember, error } = userId ? await checkRequiredChannelMember(ctx.telegram, userId) : { isMember: false, error: null };
 
     if (isMember) {
       // Enable the menu button for verified members
       if (userId) {
-        await enableMenuButton(ctx.telegram, userId);
+        const enabled = await enableMenuButton(ctx.telegram, userId);
+        
+        // Send a notification to trigger UI refresh
+        if (enabled) {
+          await ctx.answerCbQuery('✅ Menu button activated! Check the bottom of your chat.', { show_alert: false });
+        } else {
+          await ctx.answerCbQuery();
+        }
+      } else {
+        await ctx.answerCbQuery();
       }
 
       const text = [
@@ -248,9 +276,9 @@ bot.action('force_check_membership', async (ctx) => {
         'Welcome to The Golden Glow! You are now subscribed to our channel.',
         '',
         '🎮 *Menu Button Activated!*',
-        'The "Golden Glow" button is now available at the bottom of your chat.',
+        'Look at the bottom left of your chat - you should see a "Golden Glow" button.',
         '',
-        '_Note: If you don\'t see it, close and reopen this chat._',
+        '_If it doesn\'t appear, try typing any message or close/reopen the chat._',
         '',
         'Or tap the button below to start playing now:'
       ].join('\n');
@@ -265,6 +293,7 @@ bot.action('force_check_membership', async (ctx) => {
         }
       });
     } else {
+      await ctx.answerCbQuery('❌ Not verified. Please join the channel first.', { show_alert: false });
       const message = [
         '❌ *ACCESS DENIED* ❌',
         '',

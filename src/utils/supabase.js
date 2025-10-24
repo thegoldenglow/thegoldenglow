@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-let supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-let supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+let supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://luzpkuypmyidaluitvzh.supabase.co'
+let supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1enBrdXlwbXlpZGFsdWl0dnpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY3MDM4NDIsImV4cCI6MjA2MjI3OTg0Mn0.D4am_bzy02Ve5iEETJfSapppTc9g5uD5UTLCv7KqXd0'
 
 // Validate Supabase configuration
 if (!supabaseUrl || !supabaseAnonKey) {

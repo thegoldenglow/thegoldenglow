@@ -7,7 +7,7 @@ import { getTelegramBotToken } from './telegramTokenManager';
 import { supabase } from './supabase';
 
 // Default bot token as fallback - should be set via environment variable
-let cachedBotToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '8076473971:AAELDeKpUuwqXp3-4nb-8wAnA4HpigjDW84';
+let cachedBotToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || null;
 
 // Bot username - update this to match your actual bot
 const BOT_USERNAME = 'TheGoldenGlow_bot';

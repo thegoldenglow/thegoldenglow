@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     }
 
     // Validate the initData using proper cryptographic verification
-    const validationResult = validateTelegramInitData(initData, botToken);
+    const validationResult = await validateTelegramInitData(initData, botToken);
     
     if (!validationResult.valid) {
       return res.status(401).json({

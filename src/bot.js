@@ -11,7 +11,20 @@ const token = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TO
 const SKIP_MEMBERSHIP_CHECK =
   (process.env.TELEGRAM_SKIP_MEMBERSHIP_CHECK === 'true') ||
   (process.env.VITE_TELEGRAM_SKIP_MEMBERSHIP_CHECK === 'true');
-const bot = new Telegraf(token);
+const bot = token ? new Telegraf(token) : {
+  start: () => {},
+  action: () => {},
+  command: () => {},
+  help: () => {},
+  catch: () => {},
+  launch: async () => {},
+  stop: () => {},
+  handleUpdate: async () => {},
+  telegram: {
+    getChatMember: async () => { throw new Error('Missing TELEGRAM_BOT_TOKEN'); },
+    setChatMenuButton: async () => {}
+  }
+};
 
 // Required channel to join before playing
 const REQUIRED_CHANNEL = process.env.TELEGRAM_REQUIRED_CHANNEL || '@GoldenGlowGlobal';

@@ -20,10 +20,13 @@ export const handler = async (event) => {
 
     console.log('Setting webhook to:', webhookUrl);
 
-    // Set the webhook
-    const res = await fetch(
-      `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(webhookUrl)}&drop_pending_updates=true`
-    );
+    // Set the webhook with optional secret token
+    const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    let setUrl = `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(webhookUrl)}&drop_pending_updates=true`;
+    if (secret) {
+      setUrl += `&secret_token=${encodeURIComponent(secret)}`;
+    }
+    const res = await fetch(setUrl);
     const data = await res.json();
     
     if (data.ok) {

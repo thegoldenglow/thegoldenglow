@@ -211,6 +211,17 @@ export const handler = async (event) => {
       return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
+    // Optional secret verification when set via setWebhook?secret_token=...
+    const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (expectedSecret) {
+      const headers = event.headers || {};
+      const got = headers['x-telegram-bot-api-secret-token'] || headers['X-Telegram-Bot-Api-Secret-Token'];
+      if (got !== expectedSecret) {
+        console.warn('Rejected Telegram webhook: invalid secret token');
+        return { statusCode: 401, body: 'Unauthorized' };
+      }
+    }
+
     const raw = event.body || '{}';
     const payloadStr = event.isBase64Encoded ? Buffer.from(raw, 'base64').toString('utf8') : raw;
     const update = JSON.parse(payloadStr);

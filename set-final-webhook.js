@@ -1,13 +1,16 @@
 // Script to set the final clean webhook on Netlify
 import fetch from 'node-fetch';
 
-const BOT_TOKEN = "8076473971:AAELDeKpUuwqXp3-4nb-8wAnA4HpigjDW84";
-const WEBHOOK_URL = "https://lambent-pithivier-68ddb6.netlify.app/.netlify/functions/final-clean-webhook";
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.VITE_TELEGRAM_BOT_TOKEN;
+const WEBHOOK_URL = process.env.FINAL_WEBHOOK_URL || "https://lambent-pithivier-68ddb6.netlify.app/.netlify/functions/final-clean-webhook";
+const SECRET_TOKEN = process.env.TELEGRAM_WEBHOOK_SECRET || '';
 
 async function setWebhook() {
   try {
+    if (!BOT_TOKEN) {
+      throw new Error('Missing TELEGRAM_BOT_TOKEN');
+    }
     console.log('🚀 Setting final clean webhook...');
-    console.log('🤖 Bot Token:', BOT_TOKEN.substring(0, 10) + '...');
     console.log('🌐 Webhook URL:', WEBHOOK_URL);
     
     const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`, {
@@ -18,7 +21,8 @@ async function setWebhook() {
       body: JSON.stringify({
         url: WEBHOOK_URL,
         drop_pending_updates: true,
-        allowed_updates: ['message', 'callback_query']
+        allowed_updates: ['message', 'callback_query'],
+        ...(SECRET_TOKEN ? { secret_token: SECRET_TOKEN } : {})
       }),
     });
     

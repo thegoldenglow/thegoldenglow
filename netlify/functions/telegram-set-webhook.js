@@ -16,7 +16,13 @@ export const handler = async (event) => {
     const host = event.headers.host;
     const targetUrl = `${proto}://${host}/.netlify/functions/telegram-webhook`;
 
-    const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(targetUrl)}`);
+    const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    const base = `https://api.telegram.org/bot${token}/setWebhook`;
+    let setUrl = `${base}?url=${encodeURIComponent(targetUrl)}&drop_pending_updates=true`;
+    if (secret) {
+      setUrl += `&secret_token=${encodeURIComponent(secret)}`;
+    }
+    const res = await fetch(setUrl);
     const data = await res.json();
     return { statusCode: 200, body: JSON.stringify({ requested_url: targetUrl, result: data }) };
   } catch (err) {

@@ -6,7 +6,7 @@
 import { supabase } from './supabase';
 
 // Default token from environment in case database is not accessible
-const DEFAULT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '8076473971:AAELDeKpUuwqXp3-4nb-8wAnA4HpigjDW84';
+const DEFAULT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || null;
 
 // Cache the token to reduce database queries
 let cachedToken = null;

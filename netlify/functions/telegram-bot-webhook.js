@@ -7,13 +7,23 @@ if (!token) {
   console.error('Missing TELEGRAM_BOT_TOKEN in Netlify environment variables');
 }
 
-const bot = new Telegraf(token);
+const bot = token ? new Telegraf(token) : {
+  start: () => {},
+  action: () => {},
+  command: () => {},
+  help: () => {},
+  catch: () => {},
+  handleUpdate: async () => {}
+};
 
 // Configuration
 const REQUIRED_CHANNEL = process.env.TELEGRAM_REQUIRED_CHANNEL || '@GoldenGlowGlobal';
 const SKIP_MEMBERSHIP_CHECK = process.env.TELEGRAM_SKIP_MEMBERSHIP_CHECK === 'true';
 const CHANNEL_URL = `https://t.me/${REQUIRED_CHANNEL.replace('@', '')}`;
-const WEB_APP_URL = process.env.VITE_APP_URL || 'https://lambent-pithivier-68ddb6.netlify.app';
+const WEB_APP_URL = process.env.TELEGRAM_WEB_APP_URL 
+  || process.env.VITE_TELEGRAM_WEB_APP_URL 
+  || process.env.VITE_APP_URL 
+  || 'https://lambent-pithivier-68ddb6.netlify.app';
 
 // Helper: check if user is a member
 async function checkRequiredChannelMember(telegram, userId) {
@@ -233,6 +243,17 @@ export const handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') {
       return { statusCode: 405, body: 'Method Not Allowed' };
+    }
+
+    // Optional secret verification when set via setWebhook?secret_token=...
+    const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (expectedSecret) {
+      const headers = event.headers || {};
+      const got = headers['x-telegram-bot-api-secret-token'] || headers['X-Telegram-Bot-Api-Secret-Token'];
+      if (got !== expectedSecret) {
+        console.warn('Rejected Telegram webhook: invalid secret token');
+        return { statusCode: 401, body: 'Unauthorized' };
+      }
     }
 
     if (!token) {
